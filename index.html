@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Power Play © 1994 Nicholas Kapano & Robinson Kapano</title>
+<style>
+  :root {
+    --red-zone: #c0392b;
+    --blue-zone: #2980b9;
+    --white-zone: #ecf0f1;
+    --gray-piece: #7f8c8d;
+    --green-piece: #27ae60;
+    --selected: rgba(255,255,0,0.5);
+    --valid-move: rgba(0,200,0,0.35);
+    --valid-capture: rgba(255,50,50,0.45);
+    --barrier: rgba(255, 165, 0, 0.4);
+    --linked: rgba(128,0,255,0.35);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1a2e;
+    color: #eee;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 10px;
+  }
+
+  h1 {
+    font-size: 1.4em;
+    text-align: center;
+    color: #f39c12;
+    margin: 8px 0 2px;
+    text-shadow: 0 0 10px rgba(243,156,18,0.5);
+  }
+  .subtitle { font-size: 0.7em; color: #aaa; margin-bottom: 8px; text-align:center; }
+
+  .game-container {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* BOARD */
+  .board-wrap { position: relative; }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 64px);
+    grid-template-rows: repeat(8, 64px);
+    border: 3px solid #f39c12;
+    box-shadow: 0 0 20px rgba(243,156,18,0.3);
+  }
+
+  .cell {
+    width: 64px; height: 64px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    position: relative;
+    font-size: 26px;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .cell.red   { background: var(--red-zone); }
+  .cell.blue  { background: var(--blue-zone); }
+  .cell.white { background: var(--white-zone); }
+
+  .cell.selected::after {
+    content:''; position:absolute; inset:0;
+    background: var(--selected); pointer-events:none;
+  }
+  .cell.valid-move::after {
+    content:''; position:absolute; inset:0;
+    background: var(--valid-move); pointer-events:none;
+  }
+  .cell.valid-capture::after {
+    content:''; position:absolute; inset:0;
+    background: var(--valid-capture); pointer-events:none;
+  }
+  .cell.barrier-cell::before {
+    content:''; position:absolute; inset:0;
+    background: var(--barrier); pointer-events:none; z-index:1;
+  }
+  .cell.linked-cell::before {
+    content:''; position:absolute; inset:0;
+    background: var(--linked); pointer-events:none; z-index:1;
+  }
+
+  .piece {
+    z-index: 2;
+    position: relative;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
+  }
+  .piece.gray  { color: #ccc; text-shadow: 0 0 4px #fff, 0 1px 3px #000; }
+  .piece.green { color: #2ecc71; text-shadow: 0 0 4px #0f0, 0 1px 3px #000; }
+  .piece.linked { filter: drop-shadow(0 0 6px purple); }
+
+  /* SIDE PANELS */
+  .panel {
+    background: #16213e;
+    border: 1px solid #f39c12;
+    border-radius: 6px;
+    padding: 10px;
+    min-width: 190px;
+    font-size: 0.78em;
+  }
+  .panel h3 {
+    color: #f39c12;
+    margin-bottom: 8px;
+    font-size: 1em;
+    border-bottom: 1px solid #f39c12;
+    padding-bottom: 4px;
+  }
+
+  .status-row { margin: 4px 0; display:flex; justify-content:space-between; align-items:center; }
+  .turn-indicator {
+    font-size: 1.1em;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 4px;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .turn-indicator.gray-turn  { background: #444; color: #fff; }
+  .turn-indicator.green-turn { background: #1a6636; color: #2ecc71; }
+  .challenge-alert {
+    background: #c0392b;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-align: center;
+    font-weight: bold;
+    margin: 4px 0;
+    animation: pulse 1s infinite;
+    display: none;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+  .special-btn {
+    display: block;
+    width: 100%;
+    margin: 3px 0;
+    padding: 5px 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    font-weight: bold;
+    transition: all 0.2s;
+  }
+  .special-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .special-btn.power-play { background: #e67e22; color: #fff; }
+  .special-btn.navigate   { background: #2980b9; color: #fff; }
+  .special-btn.defend     { background: #c0392b; color: #fff; }
+  .special-btn.active { box-shadow: 0 0 8px 2px yellow; }
+
+  .captured-list { min-height: 28px; word-break: break-all; font-size: 1.3em; }
+
+  .log-box {
+    background: #0d0d1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 6px;
+    height: 120px;
+    overflow-y: auto;
+    font-size: 0.72em;
+    color: #aaa;
+  }
+  .log-box p { margin: 1px 0; }
+  .log-box p.important { color: #f39c12; }
+  .log-box p.challenge-log { color: #e74c3c; font-weight:bold; }
+
+  /* DICE */
+  .dice-section {
+    display: none;
+    background: #0d0d1a;
+    border: 1px solid #e67e22;
+    border-radius: 6px;
+    padding: 10px;
+    text-align: center;
+    margin-top: 6px;
+  }
+  .dice-section h4 { color: #e67e22; margin-bottom: 6px; }
+  #diceResult { font-size: 2em; margin: 6px 0; }
+  .roll-btn {
+    background: #e67e22; color: #fff; border: none;
+    padding: 6px 16px; border-radius: 4px;
+    cursor: pointer; font-size: 1em;
+    font-family: 'Courier New', monospace;
+  }
+
+  /* GAME OVER */
+  #gameOver {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 100;
+    align-items: center; justify-content: center;
+    flex-direction: column;
+  }
+  #gameOver.show { display: flex; }
+  #gameOver h2 { color: #f39c12; font-size: 2em; margin-bottom: 16px; }
+  #gameOver p  { color: #eee; font-size: 1.2em; margin-bottom: 20px; }
+  #restartBtn {
+    background: #f39c12; color: #1a1a2e; border: none;
+    padding: 10px 28px; font-size: 1.1em;
+    border-radius: 6px; cursor: pointer;
+    font-family: 'Courier New', monospace; font-weight: bold;
+  }
+
+  .legend { font-size: 0.7em; color: #888; margin-top: 8px; }
+  .legend span { margin-right: 8px; }
+
+  .options-bar { display:flex; gap:8px; margin-bottom:6px; align-items:center; font-size:0.8em; }
+  .options-bar label { cursor:pointer; }
+
+  .power-play-mode-info {
+    display:none;
+    background:#333;
+    border:1px solid #e67e22;
+    border-radius:4px;
+    padding:5px 8px;
+    font-size:0.75em;
+    color:#e67e22;
+    margin: 4px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>⚔️ POWER PLAY ⚔️</h1>
+<div class="subtitle">© 1994 Nicholas Kapano &amp; Robinson Kapano &nbsp;|&nbsp; "If you like chess, you'll love Power Play!"</div>
+
+<div class="options-bar">
+  <label><input type="checkbox" id="bombingOpt"> Enable Bombing Missions (optional rules)</label>
+</div>
+
+<div class="game-container">
+
+  <!-- LEFT PANEL: Gray Army -->
+  <div class="panel" id="grayPanel">
+    <h3>🪖 GRAY ARMY</h3>
+    <div class="turn-indicator gray-turn" id="grayTurnIndicator">YOUR TURN</div>
+    <div class="challenge-alert" id="grayChallengeAlert">⚠️ CHALLENGE!</div>
+    <div class="status-row"><span>Power Play:</span> <span id="grayPPStatus">✅ Available</span></div>
+    <div class="status-row"><span>Navigate:</span>   <span id="grayNavStatus">✅ Available</span></div>
+    <div class="status-row"><span>Defend:</span>     <span id="grayDefStatus">✅ Available</span></div>
+    <div class="status-row"><span>Plane Link:</span> <span id="grayLinkStatus">—</span></div>
+    <hr style="border-color:#333; margin:6px 0">
+    <button class="special-btn power-play" id="grayPPBtn" onclick="activatePowerPlay('gray')">⚡ POWER PLAY</button>
+    <button class="special-btn navigate"   id="grayNavBtn"  onclick="activateNavigate('gray')">🌊 NAVIGATE</button>
+    <button class="special-btn defend"     id="grayDefBtn"  onclick="activateDefend('gray')">🛡️ DEFEND</button>
+    <div class="power-play-mode-info" id="grayPPInfo"></div>
+    <hr style="border-color:#333; margin:6px 0">
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured by Gray:</div>
+    <div class="captured-list" id="grayCaptured"></div>
+    <hr style="border-color:#333; margin:6px 0">
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured from Gray:</div>
+    <div class="captured-list" id="grayLost"></div>
+  </div>
+
+  <!-- BOARD -->
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div class="dice-section" id="diceSection">
+      <h4>🎲 Bombing Roll (d10)</h4>
+      <div id="diceResult">—</div>
+      <div id="diceTarget" style="font-size:0.8em;color:#aaa;margin-bottom:4px;"></div>
+      <button class="roll-btn" onclick="rollDice()">ROLL</button>
+    </div>
+    <div class="legend">
+      <span style="color:var(--red-zone)">■ Red Zone</span>
+      <span style="color:var(--blue-zone)">■ Blue Zone</span>
+      <span style="color:#bbb">■ Neutral</span>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Green Army -->
+  <div class="panel" id="greenPanel">
+    <h3>🌿 GREEN ARMY</h3>
+    <div class="turn-indicator green-turn" id="greenTurnIndicator" style="display:none">YOUR TURN</div>
+    <div class="challenge-alert" id="greenChallengeAlert">⚠️ CHALLENGE!</div>
+    <div class="status-row"><span>Power Play:</span> <span id="greenPPStatus">✅ Available</span></div>
+    <div class="status-row"><span>Navigate:</span>   <span id="greenNavStatus">✅ Available</span></div>
+    <div class="status-row"><span>Defend:</span>     <span id="greenDefStatus">✅ Available</span></div>
+    <div class="status-row"><span>Plane Link:</span> <span id="greenLinkStatus">—</span></div>
+    <hr style="border-color:#333; margin:6px 0">
+    <button class="special-btn power-play" id="greenPPBtn" onclick="activatePowerPlay('green')">⚡ POWER PLAY</button>
+    <button class="special-btn navigate"   id="greenNavBtn"  onclick="activateNavigate('green')">🌊 NAVIGATE</button>
+    <button class="special-btn defend"     id="greenDefBtn"  onclick="activateDefend('green')">🛡️ DEFEND</button>
+    <div class="power-play-mode-info" id="greenPPInfo"></div>
+    <hr style="border-color:#333; margin:6px 0">
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured by Green:</div>
+    <div class="captured-list" id="greenCaptured"></div>
+    <hr style="border-color:#333; margin:6px 0">
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured from Green:</div>
+    <div class="captured-list" id="greenLost"></div>
+  </div>
+
+</div>
+
+<!-- LOG -->
+<div style="width:100%;max-width:680px;margin-top:8px;">
+  <div class="log-box" id="logBox"></div>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameOver">
+  <h2 id="gameOverTitle">GAME OVER</h2>
+  <p id="gameOverMsg"></p>
+  <button id="restartBtn" onclick="initGame()">PLAY AGAIN</button>
+</div>
+
+<script>
+// ===================== CONSTANTS =====================
+const PIECE_TYPES = { FOOT:'foot', OFFICER:'officer', PLANE:'plane', SHIP:'ship', GENERAL:'general', CIC:'cic' };
+const EMOJIS = {
+  gray:  { foot:'🪖', officer:'🚂', plane:'✈️', ship:'⚓', general:'⭐', cic:'👔' },
+  green: { foot:'🧢', officer:'🚃', plane:'🛩️', ship:'🛳️', general:'🌟', cic:'🎩' }
+};
+// Board zones: rows 0,7=red; rows 1,6=blue; rows 2-5=white
+function getZone(row) {
+  if (row === 0 || row === 7) return 'red';
+  if (row === 1 || row === 6) return 'blue';
+  return 'white';
+}
+function isOpponentZone(row, army) {
+  return army === 'gray' ? row >= 6 : row <= 1;
+}
+function isOpponentRedZone(row, army) {
+  return army === 'gray' ? row === 7 : row === 0;
+}
+function isOwnRedZone(row, army) {
+  return army === 'gray' ? row === 0 : row === 7;
+}
+function isOwnBlueZone(row, army) {
+  return army === 'gray' ? row === 1 : row === 6;
+}
+
+// ===================== GAME STATE =====================
+let board, currentTurn, selected, validMoves, gameOver;
+let powerPlayState = { gray: 'available', green: 'available' }; // available|used
+let navigateState  = { gray: 'available', green: 'available' };
+let defendState    = { gray: 'available', green: 'available' };
+let capturedBy     = { gray: [], green: [] }; // pieces captured BY each army
+let planeLink      = { gray: { linked: false, countdown: 0 }, green: { linked: false, countdown: 0 } };
+
+// Special mode flags
+let mode = 'normal'; // normal|powerplay|navigate|defend|recruit
+let ppState = null;  // power play sub-state
+let recruitArmy = null; // army doing recruiting
+let recruitRow = null, recruitCol = null;
+
+// Bombing
+let bombingActive = false;
+let bombTarget = null;
+
+function mkPiece(type, army) { return { type, army, moved: false }; }
+
+function initGame() {
+  board = Array.from({length:8}, () => Array(8).fill(null));
+  currentTurn = 'gray';
+  selected = null;
+  validMoves = [];
+  gameOver = false;
+  powerPlayState = { gray: 'available', green: 'available' };
+  navigateState  = { gray: 'available', green: 'available' };
+  defendState    = { gray: 'available', green: 'available' };
+  capturedBy     = { gray: [], green: [] };
+  planeLink      = { gray: { linked: false, countdown: 0 }, green: { linked: false, countdown: 0 } };
+  mode = 'normal';
+  ppState = null;
+  recruitArmy = null;
+  bombingActive = false;
+  bombTarget = null;
+
+  // Place pieces
+  const backRow = [PIECE_TYPES.OFFICER, PIECE_TYPES.PLANE, PIECE_TYPES.SHIP,
+                   PIECE_TYPES.GENERAL, PIECE_TYPES.CIC, PIECE_TYPES.SHIP,
+                   PIECE_TYPES.PLANE, PIECE_TYPES.OFFICER];
+
+  for (let c = 0; c < 8; c++) {
+    board[0][c] = mkPiece(backRow[c], 'gray');
+    board[1][c] = mkPiece(PIECE_TYPES.FOOT, 'gray');
+    board[6][c] = mkPiece(PIECE_TYPES.FOOT, 'green');
+    board[7][c] = mkPiece(backRow[c], 'green');
+  }
+
+  document.getElementById('gameOver').classList.remove('show');
+  document.getElementById('diceSection').style.display = 'none';
+  clearLog();
+  log('Game started! Gray Army moves first.', 'important');
+  render();
+  updateUI();
+}
+
+// ===================== RENDERING =====================
+function render() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  const barrierCells = getBarrierCells();
+  const linkedCells  = getLinkedCells();
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell ' + getZone(r);
+      cell.dataset.r = r; cell.dataset.c = c;
+
+      if (barrierCells.some(b => b[0]===r && b[1]===c)) cell.classList.add('barrier-cell');
+      if (linkedCells.some(l => l[0]===r && l[1]===c))  cell.classList.add('linked-cell');
+
+      if (selected && selected[0]===r && selected[1]===c) cell.classList.add('selected');
+
+      const vm = validMoves.find(m => m.row===r && m.col===c);
+      if (vm) cell.classList.add(vm.capture ? 'valid-capture' : 'valid-move');
+
+      const piece = board[r][c];
+      if (piece) {
+        const span = document.createElement('span');
+        span.className = 'piece ' + piece.army;
+        // Check if linked
+        const linked = planeLink[piece.army].linked &&
+          piece.type === PIECE_TYPES.PLANE;
+        if (linked) span.classList.add('linked');
+        span.textContent = EMOJIS[piece.army][piece.type];
+        cell.appendChild(span);
+      }
+
+      cell.addEventListener('click', () => onCellClick(r, c));
+      boardEl.appendChild(cell);
+    }
+  }
+}
+
+function getBarrierCells() {
+  const cells = [];
+  ['gray','green'].forEach(army => {
+    const officers = [];
+    for (let r=0;r<8;r++) for(let c=0;c<8;c++) {
+      const p = board[r][c];
+      if (p && p.army===army && p.type===PIECE_TYPES.OFFICER) officers.push([r,c]);
+    }
+    if (officers.length === 2) {
+      const [a, b] = officers;
+      if (a[0] === b[0]) { // same row
+        const minC = Math.min(a[1],b[1]), maxC = Math.max(a[1],b[1]);
+        let clear = true;
+        for (let c=minC+1;c<maxC;c++) if (board[a[0]][c]) { clear=false; break; }
+        if (clear) for (let c=minC;c<=maxC;c++) cells.push([a[0],c]);
+      } else if (a[1] === b[1]) { // same col
+        const minR = Math.min(a[0],b[0]), maxR = Math.max(a[0],b[0]);
+        let clear = true;
+        for (let r=minR+1;r<maxR;r++) if (board[r][a[1]]) { clear=false; break; }
+        if (clear) for (let r=minR;r<=maxR;r++) cells.push([r,a[1]]);
+      }
+    }
+  });
+  return cells;
+}
+
+function isBarrierActive(army) {
+  const officers = [];
+  for (let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p = board[r][c];
+    if (p && p.army===army && p.type===PIECE_TYPES.OFFICER) officers.push([r,c]);
+  }
+  if (officers.length !== 2) return { active: false };
+  const [a, b] = officers;
+  if (a[0] === b[0]) {
+    const minC = Math.min(a[1],b[1]), maxC = Math.max(a[1],b[1]);
+    let clear = true;
+    for (let c=minC+1;c<maxC;c++) if (board[a[0]][c]) { clear=false; break; }
+    if (clear) return { active:true, row:a[0], col:null, minC, maxC, type:'row' };
+  } else if (a[1] === b[1]) {
+    const minR = Math.min(a[0],b[0]), maxR = Math.max(a[0],b[0]);
+    let clear = true;
+    for (let r=minR+1;r<maxR;r++) if (board[r][a[1]]) { clear=false; break; }
+    if (clear) return { active:true, col:a[1], row:null, minR, maxR, type:'col' };
+  }
+  return { active: false };
+}
+
+function getLinkedCells() {
+  const cells = [];
+  ['gray','green'].forEach(army => {
+    if (planeLink[army].linked) {
+      for (let r=0;r<8;r++) for(let c=0;c<8;c++) {
+        const p = board[r][c];
+        if (p && p.army===army && p.type===PIECE_TYPES.PLANE) cells.push([r,c]);
+      }
+    }
+  });
+  return cells;
+}
+
+// ===================== UI UPDATE =====================
+function updateUI() {
+  // Turn indicators
+  document.getElementById('grayTurnIndicator').style.display  = currentTurn==='gray'  ? 'block' : 'none';
+  document.getElementById('greenTurnIndicator').style.display = currentTurn==='green' ? 'block' : 'none';
+
+  // Challenge
+  const grayInChallenge  = isInChallenge('gray');
+  const greenInChallenge = isInChallenge('green');
+  document.getElementById('grayChallengeAlert').style.display  = grayInChallenge  ? 'block' : 'none';
+  document.getElementById('greenChallengeAlert').style.display = greenInChallenge ? 'block' : 'none';
+
+  // Special ability statuses
+  ['gray','green'].forEach(a => {
+    document.getElementById(`${a}PPStatus`).textContent  = powerPlayState[a]==='available' ? '✅ Available' : '❌ Used';
+    document.getElementById(`${a}NavStatus`).textContent = navigateState[a]==='available'  ? '✅ Available' : '❌ Used';
+    document.getElementById(`${a}DefStatus`).textContent = defendState[a]==='available'    ? '✅ Available' : '❌ Used';
+
+    const lk = planeLink[a];
+    document.getElementById(`${a}LinkStatus`).textContent = lk.linked ? `🔗 Linked (${lk.countdown} turns)` : '—';
+
+    // Buttons enabled only on that army's turn
+    const isMyTurn = currentTurn === a;
+    const challenged = isInChallenge(a);
+
+    const ppBtn = document.getElementById(`${a}PPBtn`);
+    ppBtn.disabled = !(isMyTurn && powerPlayState[a]==='available' && !challenged && mode==='normal');
+
+    const navBtn = document.getElementById(`${a}NavBtn`);
+    navBtn.disabled = !(isMyTurn && navigateState[a]==='available' && mode==='normal');
+
+    const defBtn = document.getElementById(`${a}DefBtn`);
+    defBtn.disabled = !(isMyTurn && defendState[a]==='available' && !challenged && mode==='normal' &&
+      canDefend(a));
+  });
+
+  // Captured lists
+  document.getElementById('grayCaptured').textContent  = capturedBy.gray.map(p  => EMOJIS[p.army][p.type]).join(' ');
+  document.getElementById('greenCaptured').textContent = capturedBy.green.map(p => EMOJIS[p.army][p.type]).join(' ');
+  document.getElementById('grayLost').textContent  = capturedBy.green.map(p => EMOJIS[p.army][p.type]).join(' ');
+  document.getElementById('greenLost').textContent = capturedBy.gray.map(p  => EMOJIS[p.army][p.type]).join(' ');
+
+  // Highlight active special mode buttons
+  ['gray','green'].forEach(a => {
+    ['PP','Nav','Def'].forEach(t => {
+      const btn = document.getElementById(`${a}${t}Btn`);
+      btn.classList.remove('active');
+    });
+  });
+  if (mode === 'powerplay' && ppState) {
+    document.getElementById(`${ppState.army}PPBtn`).classList.add('active');
+  } else if (mode === 'navigate') {
+    document.getElementById(`${currentTurn}NavBtn`).classList.add('active');
+  } else if (mode === 'defend') {
+    document.getElementById(`${currentTurn}DefBtn`).classList.add('active');
+  }
+}
+
+function canDefend(army) {
+  const cicPos = findPiece(army, PIECE_TYPES.CIC);
+  if (!cicPos) return false;
+  if (!isOwnRedZone(cicPos[0], army)) return false;
+  const officers = findAllPieces(army, PIECE_TYPES.OFFICER);
+  const officerInRed = officers.some(([r]) => isOwnRedZone(r, army));
+  if (!officerInRed) return false;
+  // Red zone unoccupied by opponent
+  const opponent = army==='gray'?'green':'gray';
+  const redRow = army==='gray' ? 0 : 7;
+  for (let c=0;c<8;c++) {
+    if (board[redRow][c] && board[redRow][c].army===opponent) return false;
+  }
+  return true;
+}
+
+// ===================== CHALLENGE (CHECK) =====================
+function isInChallenge(army) {
+  const cicPos = findPiece(army, PIECE_TYPES.CIC);
+  if (!cicPos) return false;
+  const opponent = army==='gray'?'green':'gray';
+  return isThreatened(cicPos[0], cicPos[1], opponent);
+}
+
+function isThreatened(row, col, byArmy) {
+  // Can any piece of byArmy move to [row,col]?
+  for (let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p = board[r][c];
+    if (p && p.army===byArmy) {
+      const moves = getRawMoves(r, c, true);
+      if (moves.some(m => m.row===row && m.col===col && m.capture)) return true;
+    }
+  }
+  return false;
+}
+
+// ===================== MOVE GENERATION =====================
+function onCellClick(r, c) {
+  if (gameOver) return;
+
+  if (mode === 'navigate') { handleNavigateClick(r, c); return; }
+  if (mode === 'defend')   { handleDefendClick(r, c); return; }
+  if (mode === 'recruit')  { handleRecruitClick(r, c); return; }
+
+  const piece = board[r][c];
+
+  if (selected) {
+    const vm = validMoves.find(m => m.row===r && m.col===c);
+    if (vm) {
+      executeMove(selected[0], selected[1], r, c, vm);
+      return;
+    }
+    // Deselect or select new piece
+    if (piece && piece.army === currentTurn) {
+      selectPiece(r, c);
+      return;
+    }
+    selected = null; validMoves = []; render(); updateUI(); return;
+  }
+
+  if (piece && piece.army === currentTurn) {
+    if (mode === 'powerplay') {
+      handlePowerPlaySelect(r, c);
+      return;
+    }
+    selectPiece(r, c);
+  }
+}
+
+function selectPiece(r, c) {
+  selected = [r, c];
+  validMoves = getLegalMoves(r, c);
+  render(); updateUI();
+}
+
+function getLegalMoves(r, c) {
+  const raw = getRawMoves(r, c, false);
+  const piece = board[r][c];
+  // Filter moves that would leave own CiC in challenge
+  return raw.filter(m => {
+    // Simulate move
+    const saved = board[m.row][m.col];
+    board[m.row][m.col] = piece;
+    board[r][c] = null;
+    const inCheck = isInChallenge(piece.army);
+    board[r][c] = piece;
+    board[m.row][m.col] = saved;
+    return !inCheck;
+  });
+}
+
+function getRawMoves(r, c, captureOnly) {
+  const piece = board[r][c];
+  if (!piece) return [];
+  const { type, army } = piece;
+  const opp = army==='gray'?'green':'gray';
+  let moves = [];
+
+  switch(type) {
+    case PIECE_TYPES.FOOT:    moves = getFootMoves(r,c,army,opp,captureOnly); break;
+    case PIECE_TYPES.OFFICER: moves = getOfficerMoves(r,c,army,opp,captureOnly); break;
+    case PIECE_TYPES.PLANE:   moves = getPlaneMoves(r,c,army,opp,captureOnly); break;
+    case PIECE_TYPES.SHIP:    moves = getShipMoves(r,c,army,opp,captureOnly); break;
+    case PIECE_TYPES.GENERAL: moves = getGeneralMoves(r,c,army,opp,captureOnly); break;
+    case PIECE_TYPES.CIC:     moves = getCicMoves(r,c,army,opp,captureOnly); break;
+  }
+  return moves;
+}
+
+function inBounds(r,c) { return r>=0&&r<8&&c>=0&&c<8; }
+
+function getFootMoves(r,c,army,opp,captureOnly) {
+  const dir = army==='gray' ? 1 : -1;
+  const moves = [];
+  if (!captureOnly) {
+    // Forward 1
+    const r1 = r+dir;
+    if (inBounds(r1,c) && !board[r1][c]) {
+      moves.push({row:r1,col:c,capture:false});
+      // Forward 2 only from own rows and not in opponent zone
+      if (!isOpponentZone(r,army) && !isOpponentZone(r1,army)) {
+        const r2 = r+2*dir;
+        if (inBounds(r2,c) && !board[r2][c]) {
+          // But only 1 space in opponent zone
+          moves.push({row:r2,col:c,capture:false});
+        }
+      }
+    }
+    // Only 1 space in opponent zone
+    // (already handled — only pushed r1)
+  }
+  // Diagonal captures
+  [c-1,c+1].forEach(dc => {
+    const r1 = r+dir;
+    if (inBounds(r1,dc) && board[r1][dc] && board[r1][dc].army===opp) {
+      moves.push({row:r1,col:dc,capture:true});
+    }
+  });
+  return moves;
+}
+
+function slideMoves(r,c,army,opp,dirs) {
+  const moves = [];
+  dirs.forEach(([dr,dc]) => {
+    let nr=r+dr, nc=c+dc;
+    while(inBounds(nr,nc)) {
+      if (board[nr][nc]) {
+        if (board[nr][nc].army===opp) moves.push({row:nr,col:nc,capture:true});
+        break;
+      }
+      moves.push({row:nr,col:nc,capture:false});
+      nr+=dr; nc+=dc;
+    }
+  });
+  return moves;
+}
+
+function getOfficerMoves(r,c,army,opp) {
+  return slideMoves(r,c,army,opp,[[0,1],[0,-1],[1,0],[-1,0]]);
+}
+
+function getPlaneMoves(r,c,army,opp,captureOnly) {
+  const lMoves = [[-2,-1],[-2,1],[2,-1],[2,1],[-1,-2],[-1,2],[1,-2],[1,2]];
+  const moves = [];
+  lMoves.forEach(([dr,dc]) => {
+    const nr=r+dr, nc=c+dc;
+    if (!inBounds(nr,nc)) return;
+    const target = board[nr][nc];
+    if (!target) { if (!captureOnly) moves.push({row:nr,col:nc,capture:false}); }
+    else if (target.army===opp) moves.push({row:nr,col:nc,capture:true});
+  });
+  return moves;
+}
+
+function getShipMoves(r,c,army,opp,captureOnly) {
+  const moves = slideMoves(r,c,army,opp,[[-1,-1],[-1,1],[1,-1],[1,1]]);
+  // Shift: 1 step straight to open square
+  if (!captureOnly) {
+    [[0,1],[0,-1],[1,0],[-1,0]].forEach(([dr,dc]) => {
+      const nr=r+dr,nc=c+dc;
+      if (inBounds(nr,nc) && !board[nr][nc]) {
+        moves.push({row:nr,col:nc,capture:false,shift:true});
+      }
+    });
+  }
+  return moves;
+}
+
+function getGeneralMoves(r,c,army,opp,captureOnly) {
+  // Slide in all 8 directions
+  const moves = slideMoves(r,c,army,opp,
+    [[0,1],[0,-1],[1,0],[-1,0],[-1,-1],[-1,1],[1,-1],[1,1]]);
+  // Plane-like L moves (no jumping — needs clear path)
+  const lMoves = [[-2,-1],[-2,1],[2,-1],[2,1],[-1,-2],[-1,2],[1,-2],[1,2]];
+  lMoves.forEach(([dr,dc]) => {
+    const nr=r+dr,nc=c+dc;
+    if (!inBounds(nr,nc)) return;
+    // Check path: must be clear
+    // The L goes 2 in one axis and 1 in the other
+    let pathClear = true;
+    if (Math.abs(dr)===2) {
+      // Move 2 in row direction first
+      const mid1 = [r+Math.sign(dr), c];
+      const mid2 = [r+2*Math.sign(dr), c];
+      if (board[mid1[0]][mid1[1]] || board[mid2[0]][mid2[1]]) pathClear=false;
+    } else {
+      const mid1 = [r, c+Math.sign(dc)];
+      const mid2 = [r, c+2*Math.sign(dc)];
+      if (board[mid1[0]][mid1[1]] || board[mid2[0]][mid2[1]]) pathClear=false;
+    }
+    if (!pathClear) return;
+    const target = board[nr][nc];
+    if (!target) { if (!captureOnly) moves.push({row:nr,col:nc,capture:false,planeLike:true}); }
+    else if (target.army===opp) moves.push({row:nr,col:nc,capture:true,planeLike:true});
+  });
+  return moves;
+}
+
+function getCicMoves(r,c,army,opp,captureOnly) {
+  const moves = [];
+  [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc]) => {
+    const nr=r+dr,nc=c+dc;
+    if (!inBounds(nr,nc)) return;
+    const target=board[nr][nc];
+    if (!target) { if(!captureOnly) moves.push({row:nr,col:nc,capture:false}); }
+    else if (target.army===opp) moves.push({row:nr,col:nc,capture:true});
+  });
+  return moves;
+}
+
+// ===================== BARRIER CHECK =====================
+function crossesBarrier(fromR, fromC, toR, toC, movingArmy) {
+  // Check if a non-plane move crosses the opponent's barrier
+  const opponent = movingArmy==='gray'?'green':'gray';
+  const barrier = isBarrierActive(opponent);
+  if (!barrier.active) return false;
+
+  if (barrier.type === 'row') {
+    const barrierRow = barrier.row;
+    // Does the path cross this row between minC and maxC?
+    const minC = Math.min(fromC, toC), maxC = Math.max(fromC, toC);
+    const minR = Math.min(fromR, toR), maxR = Math.max(fromR, toR);
+    if (fromC === toC) { // vertical move
+      if (fromC >= barrier.minC && fromC <= barrier.maxC &&
+          minR <= barrierRow && maxR >= barrierRow &&
+          !(fromR === barrierRow || toR === barrierRow)) return true;
+      // Landing on barrier
+      if (toR === barrierRow && toC >= barrier.minC && toC <= barrier.maxC) return true;
+    }
+    if (fromR === toR && fromR === barrierRow) {
+      // Moving along barrier row — that's fine
+    }
+  } else if (barrier.type === 'col') {
+    const barrierCol = barrier.col;
+    const minC = Math.min(fromC, toC), maxC = Math.max(fromC, toC);
+    const minR = Math.min(fromR, toR), maxR = Math.max(fromR, toR);
+    if (fromR === toR) { // horizontal move
+      if (fromR >= barrier.minR && fromR <= barrier.maxR &&
+          minC <= barrierCol && maxC >= barrierCol &&
+          !(fromC === barrierCol || toC === barrierCol)) return true;
+      if (toC === barrierCol && toR >= barrier.minR && toR <= barrier.maxR) return true;
+    }
+  }
+  return false;
+}
+
+// ===================== EXECUTE MOVE =====================
+function executeMove(fromR, fromC, toR, toC, vm) {
+  const piece = board[fromR][fromC];
+  const target = board[toR][toC];
+  const opp = piece.army === 'gray' ? 'green' : 'gray';
+
+  // Barrier check for non-plane pieces
+  if (piece.type !== PIECE_TYPES.PLANE && crossesBarrier(fromR,fromC,toR,toC,piece.army)) {
+    log('Blocked by enemy barrier!', 'important');
+    selected=null; validMoves=[]; render(); updateUI();
+    return;
+  }
+
+  // Check if plane link is broken by landing on linked cells
+  checkBreakOwnBarrier(fromR, fromC, toR, toC, piece.army);
+
+  if (target) {
+    capturedBy[piece.army].push({type:target.type, army:target.army});
+    log(`${cap(piece.army)} ${cap(piece.type)} captures ${cap(target.army)} ${cap(target.type)}!`, 'important');
+    if (target.type === PIECE_TYPES.CIC) {
+      // Game over
+      board[toR][toC] = piece;
+      board[fromR][fromC] = null;
+      render();
+      endGame(piece.army);
+      return;
+    }
+  }
+
+  board[toR][toC] = piece;
+  board[fromR][fromC] = null;
+  piece.moved = true;
+
+  log(`${cap(piece.army)} ${cap(piece.type)} moves to (${toR},${toC})`);
+
+  // Check plane link
+  checkPlaneLink(piece.army);
+
+  // Check if foot soldier reached opponent red zone
+  if (piece.type === PIECE_TYPES.FOOT && isOpponentRedZone(toR, piece.army)) {
+    log(`${cap(piece.army)} Foot Soldier reached opponent Red Zone! Recruit or Power Play?`, 'important');
+    mode = 'recruit';
+    recruitArmy = piece.army;
+    recruitRow = toR; recruitCol = toC;
+    selected=null; validMoves=[]; render(); updateUI();
+    showRecruitDialog(piece.army);
+    return;
+  }
+
+  selected = null; validMoves = [];
+
+  // Handle power play continuation
+  if (mode === 'powerplay' && ppState) {
+    ppState.movesLeft--;
+    ppState.moved.push([toR,toC]);
+    if (ppState.captureUsed || target) ppState.captureUsed = true;
+    log(`Power Play: ${ppState.movesLeft} move(s) remaining.`);
+    if (ppState.movesLeft <= 0) {
+      endPowerPlay();
+    } else {
+      render(); updateUI();
+      showPPInfo();
+      return;
+    }
+    return;
+  }
+
+  // Check challenge announcement
+  if (isInChallenge(opp)) {
+    log(`CHALLENGE! ${cap(piece.army)} threatens the ${cap(opp)} Commander-in-Chief!`, 'challenge-log');
+  }
+
+  endTurn();
+}
+
+function checkBreakOwnBarrier(fromR, fromC, toR, toC, army) {
+  const barrier = isBarrierActive(army);
+  if (!barrier.active) return;
+  // If a friendly piece stops on the barrier line
+  if (barrier.type === 'row') {
+    if (toR === barrier.row && toC >= barrier.minC && toC <= barrier.maxC &&
+        board[toR][toC] === null) {
+      // Will place here — check if that breaks barrier
+      log(`${cap(army)} barrier broken!`);
+    }
+  } else if (barrier.type === 'col') {
+    if (toC === barrier.col && toR >= barrier.minR && toR <= barrier.maxR) {
+      log(`${cap(army)} barrier broken!`);
+    }
+  }
+}
+
+function endTurn() {
+  // Decrement opponent plane link countdown
+  const opp = currentTurn === 'gray' ? 'green' : 'gray';
+  // Actually we decrement opponent's link countdown when current player finishes their turn
+  if (planeLink[opp].linked) {
+    planeLink[opp].countdown--;
+    if (planeLink[opp].countdown <= 0) {
+      planeLink[opp].linked = false;
+      log(`${cap(opp)} plane link expired.`);
+    }
+  }
+
+  currentTurn = opp;
+  selected = null; validMoves = [];
+  mode = 'normal'; ppState = null;
+  document.getElementById('grayPPInfo').style.display = 'none';
+  document.getElementById('greenPPInfo').style.display = 'none';
+
+  // Check if new current player has any legal moves
+  if (!hasAnyLegalMove(currentTurn)) {
+    if (isInChallenge(currentTurn)) {
+      endGame(opp === 'gray' ? 'green' : 'gray');
+    } else {
+      log('Stalemate! No legal moves available.', 'important');
+    }
+  }
+
+  render(); updateUI();
+}
+
+function hasAnyLegalMove(army) {
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p = board[r][c];
+    if (p && p.army===army) {
+      if (getLegalMoves(r,c).length>0) return true;
+    }
+  }
+  return false;
+}
+
+function endGame(winner) {
+  gameOver = true;
+  document.getElementById('gameOverTitle').textContent = `${cap(winner)} Army Wins!`;
+  document.getElementById('gameOverMsg').textContent = `The ${cap(winner === 'gray' ? 'green' : 'gray')} Commander-in-Chief has been captured.`;
+  document.getElementById('gameOver').classList.add('show');
+  log(`GAME OVER — ${cap(winner)} Army wins!`, 'important');
+}
+
+// ===================== PLANE LINK =====================
+function checkPlaneLink(army) {
+  const planes = findAllPieces(army, PIECE_TYPES.PLANE);
+  if (planes.length !== 2) { planeLink[army].linked = false; return; }
+  const [a, b] = planes;
+  // Can they reach each other via L-move?
+  const lMoves = [[-2,-1],[-2,1],[2,-1],[2,1],[-1,-2],[-1,2],[1,-2],[1,2]];
+  const canReach = lMoves.some(([dr,dc]) => a[0]+dr===b[0] && a[1]+dc===b[1]);
+  if (canReach && !planeLink[army].linked) {
+    planeLink[army] = { linked: true, countdown: 3 };
+    log(`${cap(army)} planes in L-Formation — LINKED! Invincible for 3 opponent turns.`, 'important');
+  } else if (!canReach) {
+    planeLink[army].linked = false;
+  }
+}
+
+// ===================== POWER PLAY =====================
+function activatePowerPlay(army) {
+  if (currentTurn !== army) return;
+  if (powerPlayState[army] !== 'available') return;
+  if (isInChallenge(army)) { log('Cannot use Power Play while in Challenge!'); return; }
+
+  mode = 'powerplay';
+  ppState = {
+    army,
+    movesLeft: 3,
+    moved: [],
+    captureUsed: false,
+    officerCount: 0,
+    footCount: 0,
+    cicMoved: false
+  };
+  powerPlayState[army] = 'used';
+  log(`${cap(army)} activates POWER PLAY! Move up to 3 pieces.`, 'important');
+  showPPInfo();
+  selected=null; validMoves=[]; render(); updateUI();
+}
+
+function showPPInfo() {
+  if (!ppState) return;
+  const infoEl = document.getElementById(`${ppState.army}PPInfo`);
+  infoEl.style.display = 'block';
+  infoEl.textContent = `PP: ${ppState.movesLeft} moves left | Officers: ${ppState.officerCount}/2 | Foot: ${ppState.footCount}`;
+}
+
+function handlePowerPlaySelect(r, c) {
+  const piece = board[r][c];
+  if (!piece || piece.army !== currentTurn) return;
+
+  // CiC is always allowed additionally
+  if (piece.type === PIECE_TYPES.CIC) {
+    selectPiece(r,c); return;
+  }
+
+  const isOfficer = piece.type !== PIECE_TYPES.FOOT;
+
+  // Check combo rules
+  if (isOfficer && ppState.officerCount >= 2) {
+    log('Power Play: Max 2 officers allowed.'); return;
+  }
+  if (!isOfficer && ppState.footCount >= 3) {
+    log('Power Play: Max 3 foot soldiers allowed.'); return;
+  }
+  // Cannot move 3 officers
+  if (isOfficer && ppState.officerCount === 2) {
+    log('Power Play: Cannot move 3 officers.'); return;
+  }
+
+  if (isOfficer) ppState.officerCount++;
+  else ppState.footCount++;
+
+  selectPiece(r, c);
+}
+
+function endPowerPlay() {
+  log(`${cap(ppState.army)} Power Play complete.`);
+  const opp = ppState.army==='gray'?'green':'gray';
+  if (isInChallenge(opp)) {
+    log(`CHALLENGE! ${cap(ppState.army)} threatens the ${cap(opp)} Commander-in-Chief!`, 'challenge-log');
+  }
+  ppState = null;
+  endTurn();
+}
+
+// ===================== NAVIGATE =====================
+function activateNavigate(army) {
+  if (currentTurn !== army) return;
+  if (navigateState[army] !== 'available') return;
+  // Need a ship in own blue zone
+  const blueRow = army==='gray'?1:6;
+  let shipInBlue = false;
+  for(let c=0;c<8;c++) {
+    const p = board[blueRow][c];
+    if (p && p.army===army && p.type===PIECE_TYPES.SHIP) { shipInBlue=true; break; }
+  }
+  if (!shipInBlue) { log('Navigate: Need a Navy Officer (Ship) in your Blue Zone!'); return; }
+
+  mode = 'navigate';
+  navigateState[army] = 'used';
+  log(`${cap(army)} activates NAVIGATE! Click a Ship in your Blue Zone, then its destination.`, 'important');
+  selected=null; validMoves=[]; render(); updateUI();
+}
+
+let navSelectedShip = null;
+function handleNavigateClick(r, c) {
+  const blueRow = currentTurn==='gray'?1:6;
+  if (!navSelectedShip) {
+    const p = board[r][c];
+    if (!p || p.army!==currentTurn || p.type!==PIECE_TYPES.SHIP || r!==blueRow) {
+      log('Navigate: Select a Ship in your Blue Zone.'); return;
+    }
+    navSelectedShip = [r,c];
+    selected = [r,c];
+    // Valid moves: any open square in own blue row
+    validMoves = [];
+    for(let cc=0;cc<8;cc++) {
+      if (!board[blueRow][cc]) validMoves.push({row:blueRow,col:cc,capture:false});
+    }
+    render(); return;
+  }
+  // Destination
+  if (r!==blueRow || board[r][c]) {
+    log('Navigate: Must move to open square in your Blue Zone.'); return;
+  }
+  // Check not putting CiC in challenge
+  const ship = board[navSelectedShip[0]][navSelectedShip[1]];
+  board[r][c] = ship;
+  board[navSelectedShip[0]][navSelectedShip[1]] = null;
+  const opp = currentTurn==='gray'?'green':'gray';
+  if (isInChallenge(opp)) {
+    board[navSelectedShip[0]][navSelectedShip[1]] = ship;
+    board[r][c] = null;
+    log('Navigate: Cannot result in Challenge on opponent CiC!'); return;
+  }
+  log(`${cap(currentTurn)} Ship navigates to (${r},${c}).`, 'important');
+  navSelectedShip = null;
+  selected=null; validMoves=[];
+  endTurn();
+}
+
+// ===================== DEFEND =====================
+function activateDefend(army) {
+  if (currentTurn!==army) return;
+  if (defendState[army]!=='available') return;
+  if (!canDefend(army)) { log('Defend conditions not met.'); return; }
+
+  mode = 'defend';
+  defendState[army] = 'used';
+  log(`${cap(army)} activates DEFEND! Move CiC and one Army Officer within Red Zone.`, 'important');
+  selected=null; validMoves=[]; render(); updateUI();
+}
+
+let defendMoves = [];
+let defendDone = [];
+function handleDefendClick(r, c) {
+  const redRow = currentTurn==='gray'?0:7;
+
+  if (!selected) {
+    const p = board[r][c];
+    if (!p || p.army!==currentTurn || r!==redRow) { log('Defend: Select CiC or Army Officer in your Red Zone.'); return; }
+    if (p.type!==PIECE_TYPES.CIC && p.type!==PIECE_TYPES.OFFICER) { log('Defend: Only CiC or Army Officer.'); return; }
+    if (defendDone.includes(p.type)) { log('Defend: Already moved that piece type.'); return; }
+    selected=[r,c];
+    // valid = open squares in red row
+    validMoves = [];
+    for(let cc=0;cc<8;cc++) {
+      if (!board[redRow][cc]) validMoves.push({row:redRow,col:cc,capture:false});
+    }
+    render(); return;
+  }
+  if (r!==redRow || board[r][c]) { log('Defend: Must move to open square in Red Zone.'); selected=null; validMoves=[]; render(); return; }
+  const piece = board[selected[0]][selected[1]];
+  board[r][c] = piece;
+  board[selected[0]][selected[1]] = null;
+  // Check not challenging
+  const opp = currentTurn==='gray'?'green':'gray';
+  if (isInChallenge(opp)) {
+    board[selected[0]][selected[1]] = piece;
+    board[r][c] = null;
+    log('Defend: Cannot result in Challenge!'); selected=null; validMoves=[]; render(); return;
+  }
+  defendDone.push(piece.type);
+  log(`${cap(currentTurn)} ${cap(piece.type)} defended to (${r},${c}).`);
+  selected=null; validMoves=[];
+
+  if (defendDone.length >= 2) {
+    defendDone = [];
+    endTurn();
+  } else {
+    render(); updateUI();
+  }
+}
+
+// ===================== RECRUIT =====================
+function showRecruitDialog(army) {
+  // Show options: recruit a captured piece OR get power play token
+  const opp = army==='gray'?'green':'gray';
+  const lostPieces = capturedBy[opp]; // pieces opponent captured = our pieces lost... wait
+  // Pieces captured BY opponent = pieces that army can recruit back
+  // capturedBy[opp] = pieces captured BY opponent (so they're the recruiting army's pieces)
+  const recruitable = capturedBy[opp].filter(p => p.army === army);
+
+  let msg = `RECRUIT: Choose an action:\n`;
+  if (recruitable.length === 0 && powerPlayState[army]==='used') {
+    log('No captured pieces to recruit, and Power Play already used. Turn ends.', 'important');
+    recruitArmy=null; mode='normal';
+    endTurn(); return;
+  }
+
+  log(`Foot Soldier reached enemy Red Zone! Click a highlighted square to recruit a captured piece, or click the Power Play button to gain Power Play.`, 'important');
+
+  // Highlight captured pieces as options
+  // For now: show a quick prompt via a floating overlay
+  showRecruitOverlay(army, recruitable);
+}
+
+function showRecruitOverlay(army, recruitable) {
+  let overlay = document.getElementById('recruitOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'recruitOverlay';
+    overlay.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#16213e;border:2px solid #f39c12;border-radius:8px;padding:16px;z-index:50;min-width:280px;text-align:center;';
+    document.body.appendChild(overlay);
+  }
+  const opp = army==='gray'?'green':'gray';
+  const ppAvail = powerPlayState[army]==='available';
+
+  let html = `<h3 style="color:#f39c12;margin-bottom:10px;">🎖️ RECRUIT</h3>`;
+  html += `<p style="font-size:0.85em;color:#aaa;margin-bottom:10px;">Foot Soldier reached enemy Red Zone!</p>`;
+
+  if (recruitable.length > 0) {
+    html += `<p style="margin-bottom:6px;">Recruit a captured piece:</p>`;
+    recruitable.forEach((p, i) => {
+      html += `<button onclick="doRecruit(${i})" style="margin:3px;padding:4px 10px;background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:1.1em;">${EMOJIS[p.army][p.type]}</button>`;
+    });
+  } else {
+    html += `<p style="color:#aaa;margin-bottom:6px;">No captured pieces to recruit.</p>`;
+  }
+
+  if (ppAvail) {
+    html += `<hr style="border-color:#333;margin:8px 0">`;
+    html += `<button onclick="doRecruitPowerPlay()" style="margin:3px;padding:6px 14px;background:#e67e22;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">⚡ Gain Power Play</button>`;
+  }
+
+  html += `<br><button onclick="doRecruitSkip()" style="margin-top:8px;padding:4px 10px;background:#555;color:#fff;border:none;border-radius:4px;cursor:pointer;">Skip</button>`;
+  overlay.innerHTML = html;
+}
+
+window.doRecruit = function(idx) {
+  const opp = recruitArmy==='gray'?'green':'gray';
+  const recruitable = capturedBy[opp].filter(p => p.army === recruitArmy);
+  const piece = recruitable[idx];
+  // Remove from captured list
+  const capIdx = capturedBy[opp].findIndex((p,i) => p.army===recruitArmy && i===idx);
+  // Find actual index in capturedBy[opp]
+  let found = 0;
+  for(let i=0;i<capturedBy[opp].length;i++) {
+    if(capturedBy[opp][i].army===recruitArmy) {
+      if(found===idx){capturedBy[opp].splice(i,1);break;} found++;
+    }
+  }
+  board[recruitRow][recruitCol] = mkPiece(piece.type, recruitArmy);
+  log(`${cap(recruitArmy)} recruits ${cap(piece.type)}!`, 'important');
+  closeRecruitOverlay();
+};
+
+window.doRecruitPowerPlay = function() {
+  powerPlayState[recruitArmy] = 'available';
+  log(`${cap(recruitArmy)} gains a Power Play!`, 'important');
+  closeRecruitOverlay();
+};
+
+window.doRecruitSkip = function() {
+  log(`${cap(recruitArmy)} skips recruiting.`);
+  closeRecruitOverlay();
+};
+
+function closeRecruitOverlay() {
+  const ov = document.getElementById('recruitOverlay');
+  if (ov) ov.remove();
+  recruitArmy=null; recruitRow=null; recruitCol=null;
+  mode='normal';
+  endTurn();
+}
+
+// ===================== HELPERS =====================
+function findPiece(army, type) {
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p=board[r][c];
+    if(p&&p.army===army&&p.type===type) return [r,c];
+  }
+  return null;
+}
+function findAllPieces(army, type) {
+  const res=[];
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    const p=board[r][c];
+    if(p&&p.army===army&&p.type===type) res.push([r,c]);
+  }
+  return res;
+}
+function cap(s) { return s.charAt(0).toUpperCase()+s.slice(1); }
+
+// ===================== LOGGING =====================
+function log(msg, cls='') {
+  const box = document.getElementById('logBox');
+  const p = document.createElement('p');
+  if(cls) p.className=cls;
+  p.textContent = msg;
+  box.appendChild(p);
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() { document.getElementById('logBox').innerHTML=''; }
+
+// ===================== DICE =====================
+window.rollDice = function() {
+  const roll = Math.floor(Math.random()*10);
+  document.getElementById('diceResult').textContent = roll === 0 ? '0 (10)' : roll;
+  if (!bombTarget) return;
+  const { targetType, army } = bombTarget;
+  let success = false;
+  if(targetType===PIECE_TYPES.FOOT && (roll>=8||roll===0)) success=true;
+  if([PIECE_TYPES.OFFICER,PIECE_TYPES.SHIP,PIECE_TYPES.PLANE].includes(targetType) && (roll>=9||roll===0)) success=true;
+  if(targetType===PIECE_TYPES.GENERAL && roll===0) success=true;
+  if(success) {
+    log(`Bombing SUCCESS! Roll: ${roll}`, 'important');
+    // Remove target from board
+    if(bombTarget.row!==undefined) {
+      capturedBy[currentTurn].push({type:targetType,army:bombTarget.army});
+      board[bombTarget.row][bombTarget.col]=null;
+    }
+  } else {
+    log(`Bombing failed. Roll: ${roll}`);
+    if(bombTarget.kamikaze) {
+      // Remove own plane
+      log(`Kamikaze failed — plane destroyed!`, 'important');
+    }
+  }
+  bombTarget=null;
+  document.getElementById('diceSection').style.display='none';
+  render(); updateUI(); endTurn();
+};
+
+// ===================== INIT =====================
+initGame();
+</script>
+</body>
+</html>
