@@ -66,6 +66,8 @@
     font-size: 26px;
     transition: background 0.15s;
     user-select: none;
+    border: 1px solid #000;
+    box-sizing: border-box;
   }
   .cell.red   { background: var(--red-zone); }
   .cell.blue  { background: var(--blue-zone); }
@@ -95,11 +97,11 @@
   .piece {
     z-index: 2;
     position: relative;
-    text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    width: 54px;
+    height: 54px;
+    object-fit: contain;
     filter: drop-shadow(0 0 2px rgba(0,0,0,0.6));
   }
-  .piece.gray  { color: #ccc; text-shadow: 0 0 4px #fff, 0 1px 3px #000; }
-  .piece.green { color: #2ecc71; text-shadow: 0 0 4px #0f0, 0 1px 3px #000; }
   .piece.linked { filter: drop-shadow(0 0 6px purple); }
 
   /* SIDE PANELS */
@@ -322,6 +324,11 @@
 <script>
 // ===================== CONSTANTS =====================
 const PIECE_TYPES = { FOOT:'foot', OFFICER:'officer', PLANE:'plane', SHIP:'ship', GENERAL:'general', CIC:'cic' };
+const IMAGES = {
+  gray:  { foot:'PowerPlayPieces/GrayFootSoldier.png', officer:'PowerPlayPieces/GrayArmy.png', plane:'PowerPlayPieces/GrayAirForce.png', ship:'PowerPlayPieces/GrayNavy.png', general:'PowerPlayPieces/GrayFiveStarGeneral.png', cic:'PowerPlayPieces/GrayCommanderInChief.png' },
+  green: { foot:'PowerPlayPieces/GreenFootSoldier.png', officer:'PowerPlayPieces/GreenArmy.png', plane:'PowerPlayPieces/GreenAirForce.png', ship:'PowerPlayPieces/GreenNavy.png', general:'PowerPlayPieces/GreenFiveStarGeneral.png', cic:'PowerPlayPieces/GreenCommanderInChief.png' }
+};
+// Emoji used for captured piece panels
 const EMOJIS = {
   gray:  { foot:'🪖', officer:'🚂', plane:'✈️', ship:'⚓', general:'⭐', cic:'👔' },
   green: { foot:'🧢', officer:'🚃', plane:'🛩️', ship:'🛳️', general:'🌟', cic:'🎩' }
@@ -425,14 +432,16 @@ function render() {
 
       const piece = board[r][c];
       if (piece) {
-        const span = document.createElement('span');
-        span.className = 'piece ' + piece.army;
+        const img = document.createElement('img');
+        img.className = 'piece ' + piece.army;
+        img.src = IMAGES[piece.army][piece.type];
+        img.alt = piece.army + ' ' + piece.type;
+        img.draggable = false;
         // Check if linked
         const linked = planeLink[piece.army].linked &&
           piece.type === PIECE_TYPES.PLANE;
-        if (linked) span.classList.add('linked');
-        span.textContent = EMOJIS[piece.army][piece.type];
-        cell.appendChild(span);
+        if (linked) img.classList.add('linked');
+        cell.appendChild(img);
       }
 
       cell.addEventListener('click', () => onCellClick(r, c));
