@@ -235,6 +235,34 @@
     margin: 4px 0;
   }
 
+  /* SETUP MODAL */
+  .army-choice, .mode-choice {
+    border: 2px solid #555;
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #0d0d1a;
+    color: #ccc;
+    min-width: 80px;
+  }
+  .army-choice:hover, .mode-choice:hover { border-color: #f39c12; }
+  .army-choice.selected, .mode-choice.selected {
+    border-color: #f39c12;
+    background: #1a1a3e;
+    box-shadow: 0 0 8px rgba(243,156,18,0.4);
+    color: #fff;
+  }
+  /* AI thinking indicator */
+  #aiThinking {
+    display: none;
+    text-align: center;
+    color: #f39c12;
+    font-size: 0.8em;
+    margin-top: 4px;
+    animation: pulse 1s infinite;
+  }
+
   /* HELP BUTTONS */
   .help-bar {
     display: flex;
@@ -340,6 +368,7 @@
 <div class="help-bar">
   <button class="help-btn rules-btn" onclick="openRules()">📖 RULES</button>
   <button class="help-btn tutorial-btn" onclick="openTutorial()">🎓 TUTORIAL</button>
+  <button class="help-btn" style="background:#7d3c98;" onclick="openSetup()">⚙️ NEW GAME</button>
 </div>
 
 <div class="options-bar">
@@ -379,6 +408,7 @@
       <div id="diceTarget" style="font-size:0.8em;color:#aaa;margin-bottom:4px;"></div>
       <button class="roll-btn" onclick="rollDice()">ROLL</button>
     </div>
+    <div id="aiThinking">🤖 AI is thinking…</div>
     <div class="legend">
       <span style="color:var(--red-zone)">■ Red Zone</span>
       <span style="color:var(--blue-zone)">■ Blue Zone</span>
@@ -413,6 +443,48 @@
 <!-- LOG -->
 <div style="width:100%;max-width:680px;margin-top:8px;">
   <div class="log-box" id="logBox"></div>
+</div>
+
+<!-- SETUP MODAL -->
+<div class="modal-overlay" id="setupModal" onclick="closeOnOverlay(event,'setupModal')">
+  <div class="modal-box" style="max-width:480px;text-align:center;">
+    <h2 style="margin-bottom:16px;">⚙️ NEW GAME</h2>
+
+    <h3 style="margin-bottom:8px;">Choose Your Army</h3>
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:18px;">
+      <div id="armyGray" class="army-choice selected" onclick="selectArmy('gray')">
+        <img src="PowerPlayPieces/GrayCommanderInChief.png" style="width:48px;height:48px;object-fit:contain;" draggable="false">
+        <div style="margin-top:4px;font-size:0.85em;font-weight:bold;">🪖 GRAY</div>
+      </div>
+      <div id="armyGreen" class="army-choice" onclick="selectArmy('green')">
+        <img src="PowerPlayPieces/GreenCommanderInChief.png" style="width:48px;height:48px;object-fit:contain;" draggable="false">
+        <div style="margin-top:4px;font-size:0.85em;font-weight:bold;">🌿 GREEN</div>
+      </div>
+    </div>
+
+    <h3 style="margin-bottom:8px;">Game Mode</h3>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:20px;">
+      <div id="mode2p" class="mode-choice selected" onclick="selectMode('2p')">
+        <div style="font-size:1.4em;">👥</div>
+        <div style="font-size:0.8em;margin-top:3px;">2 Players</div>
+      </div>
+      <div id="modeEasy" class="mode-choice" onclick="selectMode('easy')">
+        <div style="font-size:1.4em;">🤖</div>
+        <div style="font-size:0.8em;margin-top:3px;">vs AI Easy</div>
+      </div>
+      <div id="modeMedium" class="mode-choice" onclick="selectMode('medium')">
+        <div style="font-size:1.4em;">🤖</div>
+        <div style="font-size:0.8em;margin-top:3px;">vs AI Medium</div>
+      </div>
+      <div id="modeHard" class="mode-choice" onclick="selectMode('hard')">
+        <div style="font-size:1.4em;">🤖</div>
+        <div style="font-size:0.8em;margin-top:3px;">vs AI Hard</div>
+      </div>
+    </div>
+
+    <button onclick="startNewGame()" style="background:#f39c12;color:#1a1a2e;border:none;padding:10px 32px;font-size:1em;border-radius:6px;cursor:pointer;font-family:'Courier New',monospace;font-weight:bold;">▶ START GAME</button>
+    <br><button onclick="closeModal('setupModal')" style="background:none;border:none;color:#888;font-size:0.8em;cursor:pointer;margin-top:10px;font-family:'Courier New',monospace;">Cancel</button>
+  </div>
 </div>
 
 <!-- RULES MODAL -->
@@ -527,6 +599,14 @@ let recruitRow = null, recruitCol = null;
 let bombingActive = false;
 let bombTarget = null;
 
+// AI / setup
+let gameMode    = '2p';    // '2p' | 'easy' | 'medium' | 'hard'
+let humanArmy   = 'gray';  // which army the human controls
+let aiArmy      = 'green';
+let setupArmy   = 'gray';
+let setupMode   = '2p';
+let aiThinkTimer = null;
+
 function mkPiece(type, army) { return { type, army, moved: false }; }
 
 function initGame() {
@@ -545,6 +625,8 @@ function initGame() {
   recruitArmy = null;
   bombingActive = false;
   bombTarget = null;
+  if (aiThinkTimer) { clearTimeout(aiThinkTimer); aiThinkTimer = null; }
+  document.getElementById('aiThinking').style.display = 'none';
 
   // Place pieces
   const backRow = [PIECE_TYPES.OFFICER, PIECE_TYPES.PLANE, PIECE_TYPES.SHIP,
@@ -561,9 +643,19 @@ function initGame() {
   document.getElementById('gameOver').classList.remove('show');
   document.getElementById('diceSection').style.display = 'none';
   clearLog();
-  log('Game started! Gray Army moves first.', 'important');
+  if (gameMode === '2p') {
+    log('Game started! Gray Army moves first.', 'important');
+  } else {
+    const diffLabel = gameMode.charAt(0).toUpperCase() + gameMode.slice(1);
+    const youAre = humanArmy === 'gray' ? 'Gray' : 'Green';
+    log(`Game started! You play as ${youAre} Army vs AI (${diffLabel}). Gray moves first.`, 'important');
+  }
   render();
   updateUI();
+  // If AI goes first (human is green, gray moves first)
+  if (gameMode !== '2p' && currentTurn === aiArmy) {
+    scheduleAiMove();
+  }
 }
 
 // ===================== RENDERING =====================
@@ -765,6 +857,8 @@ function isThreatened(row, col, byArmy) {
 // ===================== MOVE GENERATION =====================
 function onCellClick(r, c) {
   if (gameOver) return;
+  // Block clicks when it's the AI's turn
+  if (gameMode !== '2p' && currentTurn === aiArmy) return;
 
   if (mode === 'navigate') { handleNavigateClick(r, c); return; }
   if (mode === 'defend')   { handleDefendClick(r, c); return; }
@@ -1112,6 +1206,11 @@ function endTurn() {
   }
 
   render(); updateUI();
+
+  // Trigger AI if it's the AI's turn
+  if (gameMode !== '2p' && currentTurn === aiArmy && !gameOver) {
+    scheduleAiMove();
+  }
 }
 
 function hasAnyLegalMove(army) {
@@ -1736,6 +1835,243 @@ function tutNav(dir) {
   const total = TUT_STEPS.length;
   tutStep = Math.max(0, Math.min(total - 1, tutStep + dir));
   renderTut();
+}
+
+// ===================== SETUP UI =====================
+function openSetup() {
+  setupArmy = humanArmy;
+  setupMode = gameMode;
+  ['gray','green'].forEach(a => {
+    document.getElementById('army'+cap(a)).classList.toggle('selected', a===setupArmy);
+  });
+  ['2p','easy','medium','hard'].forEach(m => {
+    const el = document.getElementById('mode'+cap(m==='2p'?'2p':m));
+    if(el) el.classList.toggle('selected', m===setupMode);
+  });
+  document.getElementById('setupModal').classList.add('show');
+}
+function selectArmy(a) {
+  setupArmy = a;
+  document.getElementById('armyGray').classList.toggle('selected', a==='gray');
+  document.getElementById('armyGreen').classList.toggle('selected', a==='green');
+}
+function selectMode(m) {
+  setupMode = m;
+  ['2p','easy','medium','hard'].forEach(x => {
+    const id = 'mode'+(x==='2p'?'2p':cap(x));
+    const el = document.getElementById(id);
+    if(el) el.classList.toggle('selected', x===m);
+  });
+}
+function startNewGame() {
+  closeModal('setupModal');
+  gameMode  = setupMode;
+  humanArmy = setupArmy;
+  aiArmy    = humanArmy === 'gray' ? 'green' : 'gray';
+  initGame();
+}
+
+// ===================== AI ENGINE =====================
+
+// Piece values for evaluation
+const PIECE_VALUES = {
+  foot: 100, officer: 500, plane: 320, ship: 330, general: 900, cic: 20000
+};
+
+// Positional bonuses: encourage advancing and central control
+function posBonus(type, army, r, c) {
+  const rank = army === 'gray' ? r : (7 - r); // 0=home, 7=enemy
+  let bonus = 0;
+  if (type === 'foot')    bonus = rank * 8 + (c>=2&&c<=5 ? 5 : 0);
+  if (type === 'officer') bonus = (c>=1&&c<=6 ? 10 : 0) + (rank>=2&&rank<=5?8:0);
+  if (type === 'plane')   bonus = (c>=2&&c<=5&&rank>=2&&rank<=5?15:5);
+  if (type === 'ship')    bonus = rank * 5;
+  if (type === 'general') bonus = (rank>=2&&rank<=5&&c>=2&&c<=5?12:0);
+  if (type === 'cic')     bonus = rank <= 1 ? 20 : -30 * (rank - 1); // penalise exposed CiC
+  return bonus;
+}
+
+function evaluateBoard(forArmy) {
+  const opp = forArmy === 'gray' ? 'green' : 'gray';
+  let score = 0;
+  for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+    const p = board[r][c];
+    if (!p) continue;
+    const val = PIECE_VALUES[p.type] + posBonus(p.type, p.army, r, c);
+    if (p.army === forArmy) score += val;
+    else score -= val;
+  }
+  // Bonus for plane link
+  ['gray','green'].forEach(a => {
+    const mult = a === forArmy ? 1 : -1;
+    if (planeLink[a].linked) score += mult * 80;
+  });
+  // Bonus: having special abilities unused
+  ['powerPlay','navigate','defend'].forEach(key => {
+    const stateMap = { powerPlay: powerPlayState, navigate: navigateState, defend: defendState };
+    if (stateMap[key][forArmy] === 'available') score += 30;
+    if (stateMap[key][opp]     === 'available') score -= 30;
+  });
+  return score;
+}
+
+// Deep-clone board state for rollback
+function cloneBoardState() {
+  return {
+    board: board.map(row => row.map(p => p ? {...p} : null)),
+    powerPlayState: {...powerPlayState},
+    navigateState:  {...navigateState},
+    defendState:    {...defendState},
+    capturedBy:     { gray: [...capturedBy.gray.map(p=>({...p}))], green: [...capturedBy.green.map(p=>({...p}))] },
+    planeLink:      { gray: {...planeLink.gray}, green: {...planeLink.green} }
+  };
+}
+
+function restoreBoardState(snap) {
+  board          = snap.board.map(row => row.map(p => p ? {...p} : null));
+  powerPlayState = {...snap.powerPlayState};
+  navigateState  = {...snap.navigateState};
+  defendState    = {...snap.defendState};
+  capturedBy     = { gray: snap.capturedBy.gray.map(p=>({...p})), green: snap.capturedBy.green.map(p=>({...p})) };
+  planeLink      = { gray: {...snap.planeLink.gray}, green: {...snap.planeLink.green} };
+}
+
+// Get all possible moves for a given army as {fromR,fromC,toR,toC} objects
+function getAllMovesForArmy(army) {
+  const moves = [];
+  for (let r=0;r<8;r++) for (let c=0;c<8;c++) {
+    const p = board[r][c];
+    if (!p || p.army !== army) continue;
+    const legal = getLegalMoves(r, c);
+    legal.forEach(m => moves.push({fromR:r, fromC:c, toR:m.row, toC:m.col, capture:m.capture}));
+  }
+  return moves;
+}
+
+// Apply a simple move on the current board (no special abilities)
+function applySimpleMove(mv) {
+  const piece = board[mv.fromR][mv.fromC];
+  const target = board[mv.toR][mv.toC];
+  if (target) capturedBy[piece.army].push({type:target.type, army:target.army});
+  board[mv.toR][mv.toC] = piece;
+  board[mv.fromR][mv.fromC] = null;
+  piece.moved = true;
+  checkPlaneLink(piece.army);
+}
+
+// Score a move for move ordering (captures first, central moves preferred)
+function scoreMoveOrder(mv) {
+  let s = 0;
+  const target = board[mv.toR][mv.toC];
+  if (target) s += PIECE_VALUES[target.type];
+  // Central preference
+  if (mv.toC >= 2 && mv.toC <= 5) s += 5;
+  return s;
+}
+
+// Minimax with alpha-beta pruning
+function minimax(depth, alpha, beta, maximising, forArmy) {
+  const oppArmy = forArmy === 'gray' ? 'green' : 'gray';
+  const activeArmy = maximising ? forArmy : oppArmy;
+
+  // Terminal checks
+  if (!findPiece('gray', PIECE_TYPES.CIC)) return forArmy === 'green' ?  99999 : -99999;
+  if (!findPiece('green', PIECE_TYPES.CIC)) return forArmy === 'gray' ?  99999 : -99999;
+  if (depth === 0) return evaluateBoard(forArmy);
+
+  const moves = getAllMovesForArmy(activeArmy);
+  if (moves.length === 0) return maximising ? -99000 : 99000;
+
+  // Move ordering: try captures and central moves first
+  moves.sort((a,b) => scoreMoveOrder(b) - scoreMoveOrder(a));
+
+  if (maximising) {
+    let best = -Infinity;
+    for (const mv of moves) {
+      const snap = cloneBoardState();
+      applySimpleMove(mv);
+      const score = minimax(depth-1, alpha, beta, false, forArmy);
+      restoreBoardState(snap);
+      if (score > best) best = score;
+      if (best > alpha) alpha = best;
+      if (beta <= alpha) break;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const mv of moves) {
+      const snap = cloneBoardState();
+      applySimpleMove(mv);
+      const score = minimax(depth-1, alpha, beta, true, forArmy);
+      restoreBoardState(snap);
+      if (score < best) best = score;
+      if (best < beta) beta = best;
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+}
+
+function getAiDepth() {
+  if (gameMode === 'easy')   return 1;
+  if (gameMode === 'medium') return 2;
+  if (gameMode === 'hard')   return 3;
+  return 2;
+}
+
+function scheduleAiMove() {
+  document.getElementById('aiThinking').style.display = 'block';
+  // Small delay so the UI updates before the blocking minimax call
+  aiThinkTimer = setTimeout(() => {
+    doAiMove();
+  }, 350);
+}
+
+function doAiMove() {
+  document.getElementById('aiThinking').style.display = 'none';
+  if (gameOver || currentTurn !== aiArmy) return;
+
+  // Easy: sometimes pick a random move
+  const moves = getAllMovesForArmy(aiArmy);
+  if (!moves.length) { endTurn(); return; }
+
+  let chosen;
+
+  if (gameMode === 'easy') {
+    // 50% random, 50% one-ply best
+    if (Math.random() < 0.5) {
+      chosen = moves[Math.floor(Math.random() * moves.length)];
+    }
+  }
+
+  if (!chosen) {
+    const depth = getAiDepth();
+    let best = -Infinity;
+    moves.sort((a,b) => scoreMoveOrder(b) - scoreMoveOrder(a));
+
+    for (const mv of moves) {
+      const snap = cloneBoardState();
+      applySimpleMove(mv);
+      const score = minimax(depth-1, -Infinity, Infinity, false, aiArmy);
+      restoreBoardState(snap);
+      // Add tiny noise on easy to avoid perfect play
+      const noise = gameMode === 'easy' ? (Math.random() * 60 - 30) : 0;
+      if (score + noise > best) { best = score + noise; chosen = mv; }
+    }
+  }
+
+  if (!chosen) chosen = moves[0];
+
+  // Execute the chosen move via the normal game path
+  const piece = board[chosen.fromR][chosen.fromC];
+  const vm = getLegalMoves(chosen.fromR, chosen.fromC).find(m => m.row===chosen.toR && m.col===chosen.toC);
+  if (vm) {
+    selectPiece(chosen.fromR, chosen.fromC);
+    executeMove(chosen.fromR, chosen.fromC, chosen.toR, chosen.toC, vm);
+  } else {
+    // Fallback: just end turn
+    endTurn();
+  }
 }
 
 // ===================== INIT =====================
