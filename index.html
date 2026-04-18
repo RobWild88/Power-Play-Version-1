@@ -234,12 +234,113 @@
     color:#e67e22;
     margin: 4px 0;
   }
+
+  /* HELP BUTTONS */
+  .help-bar {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  .help-btn {
+    padding: 6px 16px;
+    border: 1px solid #f39c12;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+    font-weight: bold;
+    transition: all 0.2s;
+    color: #fff;
+  }
+  .help-btn.rules-btn    { background: #5d6d7e; }
+  .help-btn.tutorial-btn { background: #1a7a5e; }
+  .help-btn:hover { filter: brightness(1.2); }
+
+  /* MODAL OVERLAY */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 200;
+    align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal-box {
+    background: #16213e;
+    border: 2px solid #f39c12;
+    border-radius: 8px;
+    padding: 20px 24px;
+    max-width: 560px;
+    width: 90%;
+    max-height: 82vh;
+    overflow-y: auto;
+    position: relative;
+    font-family: 'Courier New', monospace;
+    color: #eee;
+  }
+  .modal-box h2 {
+    color: #f39c12;
+    font-size: 1.2em;
+    margin-bottom: 14px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #f39c12;
+  }
+  .modal-box h3 {
+    color: #f39c12;
+    font-size: 0.95em;
+    margin: 12px 0 5px;
+  }
+  .modal-box p, .modal-box li {
+    font-size: 0.82em;
+    line-height: 1.6;
+    color: #ccc;
+    margin-bottom: 4px;
+  }
+  .modal-box ul { padding-left: 18px; margin-bottom: 8px; }
+  .modal-close {
+    position: absolute;
+    top: 10px; right: 14px;
+    background: none; border: none;
+    color: #f39c12; font-size: 1.4em;
+    cursor: pointer; line-height: 1;
+  }
+  .modal-close:hover { color: #fff; }
+
+  /* TUTORIAL */
+  .tut-step { text-align: center; }
+  .tut-icon { font-size: 3em; margin: 10px 0 6px; }
+  .tut-title { color: #f39c12; font-size: 1em; font-weight: bold; margin-bottom: 8px; }
+  .tut-body  { font-size: 0.84em; color: #ccc; line-height: 1.7; text-align: left; }
+  .tut-nav {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 16px;
+  }
+  .tut-nav-btn {
+    background: #5d6d7e; color: #fff; border: none;
+    padding: 6px 14px; border-radius: 4px;
+    cursor: pointer; font-family: 'Courier New', monospace;
+    font-size: 0.82em; font-weight: bold;
+  }
+  .tut-nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .tut-nav-btn.finish { background: #1a7a5e; }
+  .tut-counter { font-size: 0.75em; color: #888; }
+  .zone-swatch {
+    display: inline-block; width: 14px; height: 14px;
+    border-radius: 2px; vertical-align: middle; margin-right: 4px;
+  }
 </style>
 </head>
 <body>
 
 <h1>⚔️ POWER PLAY ⚔️</h1>
 <div class="subtitle">© 1994 Nicholas Kapano &amp; Robinson Kapano &nbsp;|&nbsp; "If you like chess, you'll love Power Play!"</div>
+
+<div class="help-bar">
+  <button class="help-btn rules-btn" onclick="openRules()">📖 RULES</button>
+  <button class="help-btn tutorial-btn" onclick="openTutorial()">🎓 TUTORIAL</button>
+</div>
 
 <div class="options-bar">
   <label><input type="checkbox" id="bombingOpt"> Enable Bombing Missions (optional rules)</label>
@@ -312,6 +413,62 @@
 <!-- LOG -->
 <div style="width:100%;max-width:680px;margin-top:8px;">
   <div class="log-box" id="logBox"></div>
+</div>
+
+<!-- RULES MODAL -->
+<div class="modal-overlay" id="rulesModal" onclick="closeOnOverlay(event,'rulesModal')">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('rulesModal')">✕</button>
+    <h2>📖 POWER PLAY — Rules</h2>
+
+    <h3>🎯 The Goal</h3>
+    <p>Capture the enemy <strong>Commander-in-Chief (CiC)</strong>. Gray Army moves first.</p>
+
+    <h3>🗺️ The Board</h3>
+    <ul>
+      <li><span class="zone-swatch" style="background:#c0392b;"></span><strong>Red Zone</strong> (back row) — your home base</li>
+      <li><span class="zone-swatch" style="background:#2980b9;"></span><strong>Blue Zone</strong> (second row) — your front line</li>
+      <li><span class="zone-swatch" style="background:#bbb;"></span><strong>White Zone</strong> (middle rows) — the battlefield</li>
+    </ul>
+
+    <h3>♟️ The Pieces</h3>
+    <ul style="list-style:none;padding-left:0;">
+      <li style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><img src="PowerPlayPieces/GrayFootSoldier.png" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" draggable="false"><span><strong>Foot Soldier</strong> — moves forward 1 space (or 2 from starting row). Captures diagonally. Only 1 space per turn in enemy territory.</span></li>
+      <li style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><img src="PowerPlayPieces/GrayArmy.png" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" draggable="false"><span><strong>Army Officer</strong> — slides any number of squares horizontally or vertically. Two Officers facing each other with nothing between form a <em>Barrier</em>.</span></li>
+      <li style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><img src="PowerPlayPieces/GrayAirForce.png" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" draggable="false"><span><strong>Air Force</strong> — moves in an L-shape (2+1 squares). Jumps over other pieces. Two Air Force pieces one L-jump apart become <em>Linked</em> and invincible for 3 turns.</span></li>
+      <li style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><img src="PowerPlayPieces/GrayNavy.png" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" draggable="false"><span><strong>Navy</strong> — slides diagonally any distance, OR shifts 1 square straight.</span></li>
+      <li style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><img src="PowerPlayPieces/GrayFiveStarGeneral.png" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" draggable="false"><span><strong>General</strong> — moves any direction, any distance. Can also do L-jumps if the path is clear.</span></li>
+      <li style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><img src="PowerPlayPieces/GrayCommanderInChief.png" style="width:32px;height:32px;object-fit:contain;flex-shrink:0;" draggable="false"><span><strong>Commander-in-Chief</strong> — moves 1 square in any direction. <em>Protect this piece!</em></span></li>
+    </ul>
+
+    <h3>⚠️ Special Rules</h3>
+    <ul>
+      <li><strong>Challenge</strong> — If your CiC is threatened, a ⚠️ CHALLENGE alert appears. You must move out of danger immediately.</li>
+      <li><strong>Barrier</strong> — Two of your Army Officers aligned on the same row or column (nothing between them) block enemies from crossing that line. Planes ignore barriers.</li>
+      <li><strong>Plane Link</strong> — Two Air Force pieces one L-jump apart become LINKED — they cannot be captured for 3 of the opponent's turns.</li>
+      <li><strong>Recruiting</strong> — When a Foot Soldier reaches the enemy Red Zone, choose: recruit a captured piece back onto the board, or earn a Power Play token.</li>
+    </ul>
+
+    <h3>⚡ Special Abilities <em>(once per game each)</em></h3>
+    <ul>
+      <li><strong>⚡ Power Play</strong> — Move up to 3 different pieces in one turn (max 2 Army Officers). Cannot use while in Challenge.</li>
+      <li><strong>🌊 Navigate</strong> — Instantly move one of your Navy pieces to any open square in your Blue Zone.</li>
+      <li><strong>🛡️ Defend</strong> — When your CiC and an Army Officer are both in your Red Zone, reposition both anywhere within your Red Zone.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- TUTORIAL MODAL -->
+<div class="modal-overlay" id="tutorialModal" onclick="closeOnOverlay(event,'tutorialModal')">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal('tutorialModal')">✕</button>
+    <div id="tutContent"></div>
+    <div class="tut-nav">
+      <button class="tut-nav-btn" id="tutPrev" onclick="tutNav(-1)">◀ PREV</button>
+      <span class="tut-counter" id="tutCounter"></span>
+      <button class="tut-nav-btn" id="tutNext" onclick="tutNav(1)">NEXT ▶</button>
+    </div>
+  </div>
 </div>
 
 <!-- GAME OVER -->
@@ -1317,6 +1474,269 @@ window.rollDice = function() {
   document.getElementById('diceSection').style.display='none';
   render(); updateUI(); endTurn();
 };
+
+// ===================== RULES & TUTORIAL =====================
+function openRules() {
+  document.getElementById('rulesModal').classList.add('show');
+}
+function openTutorial() {
+  tutStep = 0;
+  renderTut();
+  document.getElementById('tutorialModal').classList.add('show');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+function closeOnOverlay(e, id) {
+  if (e.target === document.getElementById(id)) closeModal(id);
+}
+
+// ---- Mini board builder ----
+function buildMiniBoard(cfg, pieceImg) {
+  const { size, pieceAt, moves = [], captures = [], shiftMoves = [] } = cfg;
+  const px = 40;
+  let html = `<div style="display:flex;flex-direction:column;align-items:center;margin:6px 0 2px;">`;
+  html += `<div style="display:inline-grid;grid-template-columns:repeat(${size},${px}px);grid-template-rows:repeat(${size},${px}px);border:2px solid #f39c12;border-radius:4px;overflow:hidden;">`;
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const isPiece   = r === pieceAt[0] && c === pieceAt[1];
+      const isMove    = moves.some(m => m[0]===r && m[1]===c);
+      const isCapture = captures.some(m => m[0]===r && m[1]===c);
+      const isShift   = shiftMoves.some(m => m[0]===r && m[1]===c);
+      const baseBg    = (r+c)%2===0 ? '#2c3e50' : '#34495e';
+      let overlay = '';
+      if      (isCapture) overlay = 'position:absolute;inset:0;background:rgba(255,50,50,0.55);pointer-events:none;';
+      else if (isMove)    overlay = 'position:absolute;inset:0;background:rgba(0,200,0,0.40);pointer-events:none;';
+      else if (isShift)   overlay = 'position:absolute;inset:0;background:rgba(41,128,185,0.50);pointer-events:none;';
+      html += `<div style="width:${px}px;height:${px}px;background:${baseBg};display:flex;align-items:center;justify-content:center;position:relative;box-sizing:border-box;border:1px solid #111;">`;
+      if (overlay) html += `<div style="${overlay}"></div>`;
+      if (isPiece && pieceImg) {
+        html += `<img src="${pieceImg}" style="width:34px;height:34px;object-fit:contain;position:relative;z-index:1;filter:drop-shadow(0 0 2px rgba(0,0,0,0.9));" draggable="false">`;
+      } else if (isCapture) {
+        html += `<div style="width:13px;height:13px;border-radius:50%;background:rgba(220,50,50,0.95);position:relative;z-index:1;"></div>`;
+      } else if (isMove) {
+        html += `<div style="width:13px;height:13px;border-radius:50%;background:rgba(0,190,0,0.95);position:relative;z-index:1;"></div>`;
+      } else if (isShift) {
+        html += `<div style="width:13px;height:13px;border-radius:50%;background:rgba(41,128,185,0.95);position:relative;z-index:1;"></div>`;
+      }
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  // Legend
+  let legend = `<div style="font-size:0.67em;color:#888;margin-top:3px;text-align:center;">`;
+  legend += `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:rgba(0,190,0,0.95);vertical-align:middle;margin-right:3px;"></span>move &nbsp;`;
+  if (captures.length) legend += `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:rgba(220,50,50,0.95);vertical-align:middle;margin-right:3px;"></span>capture &nbsp;`;
+  if (shiftMoves.length) legend += `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:rgba(41,128,185,0.95);vertical-align:middle;margin-right:3px;"></span>shift`;
+  legend += '</div></div>';
+  return html + legend;
+}
+
+const TUT_STEPS = [
+  {
+    icon: '⚔️',
+    title: 'Welcome to Power Play!',
+    body: `Power Play is a 2-player strategy game inspired by chess — but with its own unique twists.<br><br>
+           <strong>Your goal:</strong> Capture the enemy's <strong>Commander-in-Chief</strong>.<br><br>
+           <strong>Gray Army</strong> always moves first. Players take turns moving one piece at a time (unless using a Special Ability).`
+  },
+  {
+    icon: '🗺️',
+    title: 'The Board — 3 Zones',
+    body: `The 8×8 board is divided into colored zones:<br><br>
+           <span style="display:inline-block;width:14px;height:14px;border-radius:2px;background:#c0392b;vertical-align:middle;margin-right:4px;"></span>
+           <strong>Red Zone</strong> (back row) — your home base. Keep your CiC safe here!<br><br>
+           <span style="display:inline-block;width:14px;height:14px;border-radius:2px;background:#2980b9;vertical-align:middle;margin-right:4px;"></span>
+           <strong>Blue Zone</strong> (second row) — your front line. Important for Navy and Navigate.<br><br>
+           <span style="display:inline-block;width:14px;height:14px;border-radius:2px;background:#bbb;vertical-align:middle;margin-right:4px;"></span>
+           <strong>White Zone</strong> (middle 4 rows) — the main battlefield where most action happens.`
+  },
+  {
+    pieceImg: 'PowerPlayPieces/GrayFootSoldier.png',
+    miniBoard: {
+      size: 5,
+      pieceAt: [2, 2],
+      moves:    [[3,2],[4,2]],
+      captures: [[3,1],[3,3]]
+    },
+    title: 'Foot Soldier',
+    body: `Your front-line fighter. You start with 8 of them.<br><br>
+           <strong>Move:</strong> Forward 1 square per turn (green dots). From its starting row, it can advance 2 squares on its first move.<br>
+           <strong>Capture:</strong> Diagonally forward only (red dots) — never straight ahead.<br>
+           <strong>In enemy territory:</strong> Slows to 1 square per turn.<br><br>
+           <em>Tip: Rush a Foot Soldier all the way to the enemy Red Zone to earn a big reward!</em>`
+  },
+  {
+    pieceImg: 'PowerPlayPieces/GrayArmy.png',
+    miniBoard: {
+      size: 5,
+      pieceAt: [2, 2],
+      moves: [[0,2],[1,2],[3,2],[4,2],[2,0],[2,1],[2,3],[2,4]]
+    },
+    title: 'Army Officer',
+    body: `Controls entire rows and columns — like a rook in chess.<br><br>
+           <strong>Move:</strong> Slides any number of squares horizontally or vertically. Cannot jump over pieces.<br><br>
+           <strong>Barrier:</strong> When your two Army Officers face each other on the same row or column with nothing between them, they form a <strong>Barrier</strong> — enemy pieces (except Air Force) cannot cross it!<br><br>
+           <em>Tip: Line up your two Army Officers early to build a defensive wall.</em>`
+  },
+  {
+    pieceImg: 'PowerPlayPieces/GrayAirForce.png',
+    miniBoard: {
+      size: 5,
+      pieceAt: [2, 2],
+      moves: [[0,1],[0,3],[1,0],[1,4],[3,0],[3,4],[4,1],[4,3]]
+    },
+    title: 'Air Force',
+    body: `Strikes from unexpected angles — like a knight in chess.<br><br>
+           <strong>Move:</strong> An L-shape: <em>2 squares in one direction, then 1 square sideways</em>. It <strong>jumps over</strong> any pieces in the way — nothing can block it!<br><br>
+           <strong>Plane Link:</strong> If your two Air Force pieces are exactly one L-jump apart, they become <strong>LINKED</strong> and cannot be captured for 3 of the opponent's turns.<br><br>
+           <em>Tip: Air Force also ignores Barriers — great for attacking past enemy defenses.</em>`
+  },
+  {
+    pieceImg: 'PowerPlayPieces/GrayNavy.png',
+    miniBoard: {
+      size: 5,
+      pieceAt: [2, 2],
+      moves:      [[0,0],[1,1],[3,3],[4,4],[0,4],[1,3],[3,1],[4,0]],
+      shiftMoves: [[1,2],[3,2],[2,1],[2,3]]
+    },
+    title: 'Navy',
+    body: `A long-range diagonal attacker — like a bishop in chess, with a bonus move.<br><br>
+           <strong>Diagonal slide:</strong> Moves any number of squares diagonally (green). Cannot jump over pieces.<br>
+           <strong>Shift move:</strong> Can instead shift <em>1 square horizontally or vertically</em> (blue) — reaching squares a bishop never could!<br><br>
+           <strong>Navigate ability:</strong> Once per game, teleport a Navy piece instantly to any open square in your Blue Zone.<br><br>
+           <em>Tip: Use the shift to dodge attacks or reach a key square quickly.</em>`
+  },
+  {
+    pieceImg: 'PowerPlayPieces/GrayFiveStarGeneral.png',
+    miniBoard: {
+      size: 5,
+      pieceAt: [2, 2],
+      moves: [
+        [0,0],[1,1],[3,3],[4,4],[0,4],[1,3],[3,1],[4,0],
+        [0,2],[1,2],[3,2],[4,2],[2,0],[2,1],[2,3],[2,4],
+        [0,1],[0,3],[1,0],[1,4],[3,0],[3,4],[4,1],[4,3]
+      ]
+    },
+    title: 'General',
+    body: `Your most powerful piece — queen-like movement, plus more.<br><br>
+           <strong>Move:</strong> Slides any number of squares in <em>any direction</em> — horizontal, vertical, or diagonal. Cannot jump over pieces.<br>
+           <strong>L-jump:</strong> Can also move in an L-shape like the Air Force, but <em>only if the two squares leading to the jump are clear</em>.<br><br>
+           <em>Tip: Protect your General early. Losing it makes winning much harder.</em>`
+  },
+  {
+    pieceImg: 'PowerPlayPieces/GrayCommanderInChief.png',
+    miniBoard: {
+      size: 5,
+      pieceAt: [2, 2],
+      moves: [[1,1],[1,2],[1,3],[2,1],[2,3],[3,1],[3,2],[3,3]]
+    },
+    title: 'Commander-in-Chief (CiC)',
+    body: `Your most important piece. If the enemy captures it, <strong>you lose!</strong><br><br>
+           <strong>Move:</strong> 1 square in any direction (like a king in chess).<br><br>
+           Keep your CiC in your Red Zone, shielded by other pieces. It should rarely venture out.<br><br>
+           <strong>Defend ability:</strong> Once per game, if your CiC and an Army Officer are both in your Red Zone, reposition both to safer squares within that zone.<br><br>
+           <em>Tip: Never leave your CiC unprotected — one bad move can end the game!</em>`
+  },
+  {
+    icon: '⚠️',
+    title: 'Challenge (like Check)',
+    body: `When an enemy piece can capture your CiC on the very next move, you are in <strong>CHALLENGE</strong>.<br><br>
+           A flashing <strong>⚠️ CHALLENGE</strong> alert appears in your panel.<br><br>
+           <strong>You must resolve it on your turn</strong> — move your CiC out of danger, block with another piece, or capture the threatening piece.<br><br>
+           If you have no way out, that is checkmate and you lose.<br><br>
+           <em>Note: You cannot use Power Play while in Challenge.</em>`
+  },
+  {
+    icon: '⚡',
+    title: 'Special Ability — Power Play',
+    body: `Your biggest tactical weapon. Use it <strong>once per game</strong>.<br><br>
+           Press <strong>⚡ POWER PLAY</strong> on your turn, then move up to <em>3 different pieces</em> in that single turn.<br><br>
+           <strong>Limits:</strong> No more than 2 Army Officers in one Power Play. Cannot use while in Challenge.<br><br>
+           <em>Tip: Save Power Play for a decisive moment — a coordinated 3-piece attack on the enemy CiC can be game-ending.</em>`
+  },
+  {
+    icon: '🌊',
+    title: 'Special Ability — Navigate',
+    body: `Gives your Navy an instant teleport. Use it <strong>once per game</strong>.<br><br>
+           Press <strong>🌊 NAVIGATE</strong>, then select a Navy piece in your Blue Zone and choose any open square in your Blue Zone as its destination.<br><br>
+           The piece moves instantly — no path needed, nothing blocks it.<br><br>
+           <em>Tip: Use Navigate to quickly reposition a Navy piece to a powerful diagonal lane for an attack.</em>`
+  },
+  {
+    icon: '🛡️',
+    title: 'Special Ability — Defend',
+    body: `Lets you reorganize your back line when under pressure. Use it <strong>once per game</strong>.<br><br>
+           <strong>Requirements:</strong> Your CiC and at least one Army Officer must both be in your Red Zone, with no enemy pieces there.<br><br>
+           Press <strong>🛡️ DEFEND</strong>, then reposition both your CiC and the Army Officer anywhere within your Red Zone.<br><br>
+           <em>Tip: Use Defend to move your CiC away from a threatened column or untangle a cramped back row.</em>`
+  },
+  {
+    pieceImg: 'PowerPlayPieces/GrayFootSoldier.png',
+    title: 'Recruiting',
+    body: `When a Foot Soldier reaches the <strong>enemy Red Zone</strong>, you earn a reward!<br><br>
+           A menu appears with two choices:<br><br>
+           <strong>1. Recruit a piece back</strong> — bring one of your previously captured pieces back onto the board, placed where your Foot Soldier just landed.<br><br>
+           <strong>2. Earn a Power Play</strong> — get your Power Play ability back even if you've already used it!<br><br>
+           <em>Tip: If you've lost your General or Air Force, recruiting it back can completely change the game.</em>`
+  },
+  {
+    icon: '🏆',
+    title: "You're Ready to Play!",
+    body: `You now know everything you need. Here's a quick cheat sheet:<br><br>
+           • Capture the enemy Commander-in-Chief to win<br>
+           • Gray Army moves first<br>
+           • Click a piece to see where it can move<br>
+           • Green highlight = can move there &nbsp;|&nbsp; Red = can capture<br>
+           • 3 special abilities per side: ⚡ Power Play, 🌊 Navigate, 🛡️ Defend<br>
+           • Watch for the ⚠️ Challenge alert!<br><br>
+           <strong>Good luck, Commander!</strong>`
+  }
+];
+
+let tutStep = 0;
+
+function renderTut() {
+  const step = TUT_STEPS[tutStep];
+  const total = TUT_STEPS.length;
+
+  let topHtml = '';
+  if (step.miniBoard) {
+    topHtml = buildMiniBoard(step.miniBoard, step.pieceImg || null);
+  } else if (step.pieceImg) {
+    // Piece image without a mini board (e.g. Recruiting step)
+    topHtml = `<div style="text-align:center;margin:8px 0 6px;"><img src="${step.pieceImg}" style="width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 0 4px rgba(243,156,18,0.6));" draggable="false"></div>`;
+  } else {
+    topHtml = `<div class="tut-icon">${step.icon}</div>`;
+  }
+
+  document.getElementById('tutContent').innerHTML = `
+    <div class="tut-step">
+      ${topHtml}
+      <div class="tut-title">${step.title}</div>
+      <div class="tut-body">${step.body}</div>
+    </div>
+  `;
+  document.getElementById('tutCounter').textContent = `Step ${tutStep + 1} of ${total}`;
+  document.getElementById('tutPrev').disabled = tutStep === 0;
+
+  const nextBtn = document.getElementById('tutNext');
+  if (tutStep === total - 1) {
+    nextBtn.textContent = '▶ START PLAYING';
+    nextBtn.className = 'tut-nav-btn finish';
+    nextBtn.onclick = () => closeModal('tutorialModal');
+  } else {
+    nextBtn.textContent = 'NEXT ▶';
+    nextBtn.className = 'tut-nav-btn';
+    nextBtn.onclick = () => tutNav(1);
+  }
+}
+
+function tutNav(dir) {
+  const total = TUT_STEPS.length;
+  tutStep = Math.max(0, Math.min(total - 1, tutStep + dir));
+  renderTut();
+}
 
 // ===================== INIT =====================
 initGame();
