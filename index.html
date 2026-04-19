@@ -416,6 +416,19 @@
     user-select: none;
   }
 
+
+  /* ===== PIECE SLIDE ANIMATION ===== */
+  .piece-flyer {
+    position: fixed;
+    z-index: 600;
+    width: 54px; height: 54px;
+    object-fit: contain;
+    pointer-events: none;
+    filter: drop-shadow(0 6px 12px rgba(0,0,0,0.7));
+    transition: left 0.28s cubic-bezier(0.25, 0.1, 0.25, 1),
+                top  0.28s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
 </style>
 </head>
 <body>
@@ -665,6 +678,7 @@ let setupArmy   = 'gray';
 let setupMode   = '2p';
 let aiThinkTimer = null;
 let lastAiMove = null; // { from:[[r,c],...], to:[[r,c],...] } for AI move highlight
+let animating  = false; // true while a piece slide animation is running
 
 function mkPiece(type, army) { return { type, army, moved: false }; }
 
@@ -685,6 +699,7 @@ function initGame() {
   bombingActive = false;
   bombTarget = null;
   if (aiThinkTimer) { clearTimeout(aiThinkTimer); aiThinkTimer = null; }
+  animating = false; lastAiMove = null;
   document.getElementById('aiThinking').style.display = 'none';
 
   // Place pieces
@@ -933,7 +948,8 @@ function isThreatened(row, col, byArmy) {
 // ===================== MOVE GENERATION =====================
 function onCellClick(r, c) {
   if (gameOver) return;
-  // Block clicks when it's the AI's turn
+  // Block clicks while animating or when it's the AI's turn
+  if (animating) return;
   if (gameMode !== '2p' && currentTurn === aiArmy) return;
   if (lastAiMove) { lastAiMove = null; render(); }
 
@@ -946,7 +962,13 @@ function onCellClick(r, c) {
   if (selected) {
     const vm = validMoves.find(m => m.row===r && m.col===c);
     if (vm) {
-      executeMove(selected[0], selected[1], r, c, vm);
+      const [fr, fc] = selected;
+      const movingPiece = board[fr][fc];
+      const imgSrc = IMAGES[movingPiece.army][movingPiece.type];
+      selected = null; validMoves = []; render(); // clear highlights before animating
+      animatePieceSlide(fr, fc, r, c, imgSrc, () => {
+        executeMove(fr, fc, r, c, vm);
+      });
       return;
     }
     // Deselect or select new piece
@@ -2163,12 +2185,8 @@ function aiTryNavigate(army) {
     }
   }
   if (!bestFrom || bestScore <= baseScore + 25) return { used: false };
-  navigateState[army] = 'used';
-  const ship = board[bestFrom[0]][bestFrom[1]];
-  board[bestTo[0]][bestTo[1]] = ship;
-  board[bestFrom[0]][bestFrom[1]] = null;
-  log(`AI uses NAVIGATE! Ship moves to (${bestTo[0]},${bestTo[1]}).`, 'important');
-  return { used: true, from: [bestFrom], to: [bestTo] };
+  // Return plan — doAiMove will commit with animation
+  return { used: true, from: [bestFrom], to: [bestTo], navFrom: bestFrom, navTo: bestTo };
 }
 
 // AI DEFEND: reposition CiC + Officer out of danger
@@ -2201,17 +2219,15 @@ function aiTryDefend(army) {
     }
   }
   if (!bestConfig) return { used: false };
-  defendState[army] = 'used';
-  const cicPiece = board[cicPos[0]][cicPos[1]];
-  const offPiece = board[officers[0][0]][officers[0][1]];
-  board[cicPos[0]][cicPos[1]] = null;
-  board[officers[0][0]][officers[0][1]] = null;
-  board[redRow][bestConfig[0]] = cicPiece;
-  board[redRow][bestConfig[1]] = offPiece;
-  log(`AI uses DEFEND! CiC and Officer repositioned in Red Zone.`, 'important');
+  // Return plan — doAiMove will commit with animation
   const fromCells = [cicPos, officers[0]];
   const toCells = [[redRow, bestConfig[0]], [redRow, bestConfig[1]]];
-  return { used: true, from: fromCells, to: toCells };
+  return { used: true, from: fromCells, to: toCells,
+    defMoves: [
+      { piece: board[cicPos[0]][cicPos[1]],       fromR: cicPos[0],       fromC: cicPos[1],       toR: redRow, toC: bestConfig[0] },
+      { piece: board[officers[0][0]][officers[0][1]], fromR: officers[0][0], fromC: officers[0][1], toR: redRow, toC: bestConfig[1] }
+    ]
+  };
 }
 
 // AI POWER PLAY: greedy 3-move search, only trigger if gain >= threshold
@@ -2253,53 +2269,147 @@ function aiTryPowerPlay(army) {
     restoreBoardState(snap1);
   }
   if (!bestSeq || bestTotal < baseScore + 600) return { used: false };
-  powerPlayState[army] = 'used';
-  log(`AI activates POWER PLAY! (${bestSeq.length} moves)`, 'important');
-  const fromCells = [], toCells = [];
-  for (const mv of bestSeq) {
-    if (gameOver) break;
-    fromCells.push([mv.fromR, mv.fromC]);
-    toCells.push([mv.toR, mv.toC]);
-    const vm = getLegalMoves(mv.fromR, mv.fromC).find(m => m.row===mv.toR && m.col===mv.toC);
-    if (vm) {
-      const piece = board[mv.fromR][mv.fromC];
-      const target = board[mv.toR][mv.toC];
-      if (target) {
-        capturedBy[army].push({type:target.type, army:target.army});
-        const ppCells = document.querySelectorAll('#board .cell');
-        const ppIdx = mv.toR * 8 + mv.toC;
-        if (ppCells[ppIdx]) playCaptureAnimation(ppCells[ppIdx], IMAGES[target.army][target.type], target.army);
-      }
-      if (target && target.type === PIECE_TYPES.CIC) {
-        board[mv.toR][mv.toC] = piece;
-        board[mv.fromR][mv.fromC] = null;
-        render(); endGame(army); return { used: true, from: fromCells, to: toCells, alreadyEndedTurn: true };
-      }
-      board[mv.toR][mv.toC] = piece;
-      board[mv.fromR][mv.fromC] = null;
-      piece.moved = true;
-      checkPlaneLink(army);
-      log(`AI Power Play: ${cap(piece.type)} to (${mv.toR},${mv.toC})`);
+  // Return plan — doAiMove will execute with animation
+  return { used: true, moves: bestSeq };
+}
+
+
+// ===================== PIECE SLIDE ANIMATION =====================
+// Slides a piece image from one board cell to another, calls onDone when complete.
+// Does NOT modify board state — caller does that in onDone.
+function animatePieceSlide(fromR, fromC, toR, toC, imgSrc, onDone) {
+  const CELL = 64;
+  const boardEl = document.getElementById('board');
+  const boardRect = boardEl.getBoundingClientRect();
+  const fromX = boardRect.left + fromC * CELL + (CELL - 54) / 2;
+  const fromY = boardRect.top  + fromR * CELL + (CELL - 54) / 2;
+  const toX   = boardRect.left + toC   * CELL + (CELL - 54) / 2;
+  const toY   = boardRect.top  + toR   * CELL + (CELL - 54) / 2;
+
+  // Temporarily hide the piece at source so it doesn't show under the flyer
+  const cells = document.querySelectorAll('#board .cell');
+  const srcCell = cells[fromR * 8 + fromC];
+  const srcImg = srcCell ? srcCell.querySelector('.piece') : null;
+  if (srcImg) srcImg.style.visibility = 'hidden';
+
+  const flyer = document.createElement('img');
+  flyer.className = 'piece-flyer';
+  flyer.src = imgSrc;
+  flyer.style.left = fromX + 'px';
+  flyer.style.top  = fromY + 'px';
+  document.body.appendChild(flyer);
+
+  // Two rAF frames to let the browser paint the starting position before transitioning
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    flyer.style.left = toX + 'px';
+    flyer.style.top  = toY + 'px';
+  }));
+
+  setTimeout(() => {
+    flyer.remove();
+    if (srcImg) srcImg.style.visibility = '';
+    onDone();
+  }, 310);
+}
+
+// Execute AI Power Play moves one-at-a-time with animation
+function executeAiPowerPlaySeq(army, moves, idx) {
+  if (idx >= moves.length || gameOver) {
+    const fromCells = moves.map(m => [m.fromR, m.fromC]);
+    const toCells   = moves.map(m => [m.toR,   m.toC  ]);
+    lastAiMove = { from: fromCells, to: toCells };
+    animating = false;
+    if (!gameOver) {
+      const opp = army === 'gray' ? 'green' : 'gray';
+      if (isInChallenge(opp)) log(`CHALLENGE! ${cap(army)} threatens the ${cap(opp)} Commander-in-Chief!`, 'challenge-log');
+      endTurn();
     }
+    render(); updateUI();
+    return;
   }
-  return { used: true, from: fromCells, to: toCells, alreadyEndedTurn: false };
+  const mv = moves[idx];
+  const piece = board[mv.fromR][mv.fromC];
+  if (!piece) { executeAiPowerPlaySeq(army, moves, idx + 1); return; }
+
+  render(); // refresh to show state before this move
+  animatePieceSlide(mv.fromR, mv.fromC, mv.toR, mv.toC, IMAGES[piece.army][piece.type], () => {
+    // Commit this single PP move
+    const target = board[mv.toR][mv.toC];
+    if (target) {
+      capturedBy[army].push({ type: target.type, army: target.army });
+      const ppCells = document.querySelectorAll('#board .cell');
+      const ppIdx2 = mv.toR * 8 + mv.toC;
+      if (ppCells[ppIdx2]) playCaptureAnimation(ppCells[ppIdx2], IMAGES[target.army][target.type], target.army);
+    }
+    board[mv.toR][mv.toC] = piece;
+    board[mv.fromR][mv.fromC] = null;
+    piece.moved = true;
+    checkPlaneLink(army);
+    log(`AI Power Play move ${idx + 1}: ${cap(piece.type)} → (${mv.toR},${mv.toC})`);
+    if (target && target.type === PIECE_TYPES.CIC) {
+      render(); endGame(army); animating = false; return;
+    }
+    render(); updateUI();
+    // Pause between PP moves so the player can see each one
+    setTimeout(() => executeAiPowerPlaySeq(army, moves, idx + 1), 350);
+  });
 }
 
 function doAiMove() {
   document.getElementById('aiThinking').style.display = 'none';
   if (gameOver || currentTurn !== aiArmy) return;
+  animating = true;
 
   // --- Try special abilities (Medium/Hard only) ---
   if (gameMode !== 'easy') {
+    // Defend: teleport CiC + Officer out of challenge
     const defendResult = aiTryDefend(aiArmy);
     if (defendResult.used) {
-      lastAiMove = { from: defendResult.from, to: defendResult.to };
-      endTurn(); render(); updateUI(); return;
+      defendState[aiArmy] = 'used';
+      log(`AI uses DEFEND! CiC and Officer repositioned in Red Zone.`, 'important');
+      const defMoves = defendResult.defMoves;
+      // Execute two slides sequentially
+      const commitDefend = () => {
+        for (const dm of defMoves) {
+          board[dm.toR][dm.toC] = dm.piece;
+          board[dm.fromR][dm.fromC] = null;
+        }
+        lastAiMove = { from: defendResult.from, to: defendResult.to };
+        animating = false;
+        endTurn(); render(); updateUI();
+      };
+      // Animate first slide, then second, then commit
+      render();
+      animatePieceSlide(defMoves[0].fromR, defMoves[0].fromC, defMoves[0].toR, defMoves[0].toC,
+        IMAGES[defMoves[0].piece.army][defMoves[0].piece.type], () => {
+          // Temporarily show first piece at dest for second anim
+          board[defMoves[0].toR][defMoves[0].toC] = defMoves[0].piece;
+          board[defMoves[0].fromR][defMoves[0].fromC] = null;
+          render();
+          setTimeout(() => {
+            animatePieceSlide(defMoves[1].fromR, defMoves[1].fromC, defMoves[1].toR, defMoves[1].toC,
+              IMAGES[defMoves[1].piece.army][defMoves[1].piece.type], commitDefend);
+          }, 150);
+        });
+      return;
     }
+
+    // Navigate: teleport a ship to better position
     const navResult = aiTryNavigate(aiArmy);
     if (navResult.used) {
-      lastAiMove = { from: navResult.from, to: navResult.to };
-      endTurn(); render(); updateUI(); return;
+      navigateState[aiArmy] = 'used';
+      log(`AI uses NAVIGATE! Ship moves to (${navResult.navTo[0]},${navResult.navTo[1]}).`, 'important');
+      const ship = board[navResult.navFrom[0]][navResult.navFrom[1]];
+      render();
+      animatePieceSlide(navResult.navFrom[0], navResult.navFrom[1], navResult.navTo[0], navResult.navTo[1],
+        IMAGES[ship.army][ship.type], () => {
+          board[navResult.navTo[0]][navResult.navTo[1]] = ship;
+          board[navResult.navFrom[0]][navResult.navFrom[1]] = null;
+          lastAiMove = { from: [navResult.navFrom], to: [navResult.navTo] };
+          animating = false;
+          endTurn(); render(); updateUI();
+        });
+      return;
     }
   }
 
@@ -2308,15 +2418,16 @@ function doAiMove() {
   if (tryPP && powerPlayState[aiArmy] === 'available' && !isInChallenge(aiArmy)) {
     const ppResult = aiTryPowerPlay(aiArmy);
     if (ppResult.used) {
-      lastAiMove = { from: ppResult.from, to: ppResult.to };
-      if (!ppResult.alreadyEndedTurn && !gameOver) endTurn();
-      render(); updateUI(); return;
+      powerPlayState[aiArmy] = 'used';
+      log(`AI activates POWER PLAY! (${ppResult.moves.length} moves)`, 'important');
+      executeAiPowerPlaySeq(aiArmy, ppResult.moves, 0);
+      return;
     }
   }
 
   // --- Standard single move ---
   const moves = getAllMovesForArmy(aiArmy);
-  if (!moves.length) { endTurn(); return; }
+  if (!moves.length) { animating = false; endTurn(); return; }
 
   let chosen;
   if (gameMode === 'easy' && Math.random() < 0.5) {
@@ -2337,14 +2448,21 @@ function doAiMove() {
   }
   if (!chosen) chosen = moves[0];
 
+  const chosenPiece = board[chosen.fromR][chosen.fromC];
+  const imgSrc = IMAGES[chosenPiece.army][chosenPiece.type];
   lastAiMove = { from: [[chosen.fromR, chosen.fromC]], to: [[chosen.toR, chosen.toC]] };
-  const vm = getLegalMoves(chosen.fromR, chosen.fromC).find(m => m.row===chosen.toR && m.col===chosen.toC);
-  if (vm) {
-    selectPiece(chosen.fromR, chosen.fromC);
-    executeMove(chosen.fromR, chosen.fromC, chosen.toR, chosen.toC, vm);
-  } else {
-    endTurn();
-  }
+
+  // Clear selection highlight, then animate
+  selected = null; validMoves = []; render(); updateUI();
+  animatePieceSlide(chosen.fromR, chosen.fromC, chosen.toR, chosen.toC, imgSrc, () => {
+    animating = false;
+    const vm = getLegalMoves(chosen.fromR, chosen.fromC).find(m => m.row===chosen.toR && m.col===chosen.toC);
+    if (vm) {
+      executeMove(chosen.fromR, chosen.fromC, chosen.toR, chosen.toC, vm);
+    } else {
+      endTurn();
+    }
+  });
 }
 
 
