@@ -358,6 +358,64 @@
     display: inline-block; width: 14px; height: 14px;
     border-radius: 2px; vertical-align: middle; margin-right: 4px;
   }
+
+  /* ===== CAPTURE ANIMATION ===== */
+  @keyframes captureFloat {
+    0%   { transform: scale(1) rotate(0deg) translateY(0);   opacity: 1; }
+    30%  { transform: scale(1.5) rotate(-15deg) translateY(-18px); opacity: 1; }
+    70%  { transform: scale(0.7) rotate(25deg) translateY(-40px);  opacity: 0.6; }
+    100% { transform: scale(0.2) rotate(60deg) translateY(-70px);  opacity: 0; }
+  }
+  @keyframes capturePop {
+    0%   { transform: scale(0) rotate(0deg);   opacity: 1; }
+    40%  { transform: scale(1.3) rotate(180deg); opacity: 1; }
+    100% { transform: scale(0) rotate(360deg); opacity: 0; }
+  }
+  @keyframes captureParticle {
+    0%   { transform: translate(0,0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--px), var(--py)) scale(0); opacity: 0; }
+  }
+  @keyframes captureFlash {
+    0%,100% { opacity: 0; }
+    30%      { opacity: 0.7; }
+  }
+  .capture-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    width: 54px; height: 54px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(255,80,0,0.9));
+    animation: captureFloat 0.55s ease-out forwards;
+  }
+  .capture-flash {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9998;
+    border-radius: 50%;
+    width: 70px; height: 70px;
+    margin-left: -3px; margin-top: -3px;
+    background: radial-gradient(circle, rgba(255,200,0,0.95) 0%, rgba(255,80,0,0.5) 50%, transparent 75%);
+    animation: captureFlash 0.35s ease-out forwards;
+  }
+  .capture-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9997;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    animation: captureParticle 0.55s ease-out forwards;
+  }
+  .capture-bang {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    font-size: 1.6em;
+    line-height: 1;
+    animation: capturePop 0.5s ease-out forwards;
+    user-select: none;
+  }
+
 </style>
 </head>
 <body>
@@ -1124,6 +1182,12 @@ function executeMove(fromR, fromC, toR, toC, vm) {
   if (target) {
     capturedBy[piece.army].push({type:target.type, army:target.army});
     log(`${cap(piece.army)} ${cap(piece.type)} captures ${cap(target.army)} ${cap(target.type)}!`, 'important');
+    // Capture animation — fire before board updates so cell position is correct
+    const capCells = document.querySelectorAll('#board .cell');
+    const capIdx = toR * 8 + toC;
+    if (capCells[capIdx]) {
+      playCaptureAnimation(capCells[capIdx], IMAGES[target.army][target.type], target.army);
+    }
     if (target.type === PIECE_TYPES.CIC) {
       // Game over
       board[toR][toC] = piece;
@@ -2200,7 +2264,12 @@ function aiTryPowerPlay(army) {
     if (vm) {
       const piece = board[mv.fromR][mv.fromC];
       const target = board[mv.toR][mv.toC];
-      if (target) capturedBy[army].push({type:target.type, army:target.army});
+      if (target) {
+        capturedBy[army].push({type:target.type, army:target.army});
+        const ppCells = document.querySelectorAll('#board .cell');
+        const ppIdx = mv.toR * 8 + mv.toC;
+        if (ppCells[ppIdx]) playCaptureAnimation(ppCells[ppIdx], IMAGES[target.army][target.type], target.army);
+      }
       if (target && target.type === PIECE_TYPES.CIC) {
         board[mv.toR][mv.toC] = piece;
         board[mv.fromR][mv.fromC] = null;
@@ -2276,6 +2345,66 @@ function doAiMove() {
   } else {
     endTurn();
   }
+}
+
+
+// ===================== CAPTURE ANIMATION =====================
+function playCaptureAnimation(targetEl, targetPieceSrc, capturedArmy) {
+  if (!targetEl) return;
+  const rect = targetEl.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top  + rect.height / 2;
+
+  // Flash burst
+  const flash = document.createElement('div');
+  flash.className = 'capture-flash';
+  flash.style.left = (cx - 35) + 'px';
+  flash.style.top  = (cy - 35) + 'px';
+  document.body.appendChild(flash);
+
+  // Ghost piece flying away
+  const ghost = document.createElement('img');
+  ghost.className = 'capture-ghost';
+  ghost.src = targetPieceSrc;
+  ghost.style.left = (cx - 27) + 'px';
+  ghost.style.top  = (cy - 27) + 'px';
+  document.body.appendChild(ghost);
+
+  // "POW" / "BOOM" text
+  const bangs = ['💥','⚡','🔥','💣','✨'];
+  const bangEl = document.createElement('div');
+  bangEl.className = 'capture-bang';
+  bangEl.textContent = bangs[Math.floor(Math.random() * bangs.length)];
+  bangEl.style.left = (cx - 16) + 'px';
+  bangEl.style.top  = (cy - 55) + 'px';
+  document.body.appendChild(bangEl);
+
+  // Particle burst
+  const colors = {
+    gray:  ['#aaa','#ccc','#888','#eee','#f39c12'],
+    green: ['#2ecc71','#27ae60','#a9f0c7','#f39c12','#1abc9c']
+  };
+  const palette = colors[capturedArmy] || colors.gray;
+  const numParticles = 10;
+  for (let i = 0; i < numParticles; i++) {
+    const angle  = (i / numParticles) * Math.PI * 2;
+    const dist   = 35 + Math.random() * 40;
+    const px     = Math.round(Math.cos(angle) * dist);
+    const py     = Math.round(Math.sin(angle) * dist);
+    const p = document.createElement('div');
+    p.className = 'capture-particle';
+    p.style.left  = (cx - 4) + 'px';
+    p.style.top   = (cy - 4) + 'px';
+    p.style.setProperty('--px', px + 'px');
+    p.style.setProperty('--py', py + 'px');
+    p.style.background = palette[i % palette.length];
+    p.style.animationDelay = (Math.random() * 0.05) + 's';
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 700);
+  }
+
+  // Cleanup
+  setTimeout(() => { flash.remove(); ghost.remove(); bangEl.remove(); }, 650);
 }
 
 // ===================== INIT =====================
