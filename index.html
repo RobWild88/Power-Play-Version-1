@@ -606,6 +606,7 @@ let aiArmy      = 'green';
 let setupArmy   = 'gray';
 let setupMode   = '2p';
 let aiThinkTimer = null;
+let lastAiMove = null; // { from:[[r,c],...], to:[[r,c],...] } for AI move highlight
 
 function mkPiece(type, army) { return { type, army, moved: false }; }
 
@@ -694,6 +695,18 @@ function render() {
       }
 
       cell.addEventListener('click', () => onCellClick(r, c));
+      if (lastAiMove) {
+        if (lastAiMove.from.some(([fr,fc]) => fr===r && fc===c)) {
+          const aiOv = document.createElement('div');
+          aiOv.style.cssText = 'position:absolute;inset:0;background:rgba(0,200,255,0.12);pointer-events:none;z-index:1;box-shadow:inset 0 0 0 2px rgba(0,200,255,0.4);';
+          cell.appendChild(aiOv);
+        }
+        if (lastAiMove.to.some(([tr,tc]) => tr===r && tc===c)) {
+          const aiOv = document.createElement('div');
+          aiOv.style.cssText = 'position:absolute;inset:0;background:rgba(0,210,255,0.22);pointer-events:none;z-index:1;box-shadow:inset 0 0 0 3px rgba(0,220,255,0.95);';
+          cell.appendChild(aiOv);
+        }
+      }
       boardEl.appendChild(cell);
     }
   }
@@ -796,11 +809,16 @@ function updateUI() {
       canDefend(a));
   });
 
-  // Captured lists
-  document.getElementById('grayCaptured').textContent  = capturedBy.gray.map(p  => EMOJIS[p.army][p.type]).join(' ');
-  document.getElementById('greenCaptured').textContent = capturedBy.green.map(p => EMOJIS[p.army][p.type]).join(' ');
-  document.getElementById('grayLost').textContent  = capturedBy.green.map(p => EMOJIS[p.army][p.type]).join(' ');
-  document.getElementById('greenLost').textContent = capturedBy.gray.map(p  => EMOJIS[p.army][p.type]).join(' ');
+  // Captured lists — render actual piece images
+  function capturedHTML(pieces) {
+    return pieces.map(p =>
+      `<img src="${IMAGES[p.army][p.type]}" title="${cap(p.army)} ${cap(p.type)}" style="width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));vertical-align:middle;margin:1px;">`
+    ).join('');
+  }
+  document.getElementById('grayCaptured').innerHTML  = capturedHTML(capturedBy.gray);
+  document.getElementById('greenCaptured').innerHTML = capturedHTML(capturedBy.green);
+  document.getElementById('grayLost').innerHTML  = capturedHTML(capturedBy.green);
+  document.getElementById('greenLost').innerHTML = capturedHTML(capturedBy.gray);
 
   // Highlight active special mode buttons
   ['gray','green'].forEach(a => {
@@ -859,6 +877,7 @@ function onCellClick(r, c) {
   if (gameOver) return;
   // Block clicks when it's the AI's turn
   if (gameMode !== '2p' && currentTurn === aiArmy) return;
+  if (lastAiMove) { lastAiMove = null; render(); }
 
   if (mode === 'navigate') { handleNavigateClick(r, c); return; }
   if (mode === 'defend')   { handleDefendClick(r, c); return; }
@@ -1126,12 +1145,19 @@ function executeMove(fromR, fromC, toR, toC, vm) {
 
   // Check if foot soldier reached opponent red zone
   if (piece.type === PIECE_TYPES.FOOT && isOpponentRedZone(toR, piece.army)) {
-    log(`${cap(piece.army)} Foot Soldier reached opponent Red Zone! Recruit or Power Play?`, 'important');
     mode = 'recruit';
     recruitArmy = piece.army;
     recruitRow = toR; recruitCol = toC;
     selected=null; validMoves=[]; render(); updateUI();
-    showRecruitDialog(piece.army);
+    if (gameMode !== '2p' && piece.army === aiArmy) {
+      aiAutoRecruit(piece.army, toR, toC);
+      recruitArmy = null; recruitRow = null; recruitCol = null;
+      mode = 'normal';
+      endTurn();
+    } else {
+      log(`${cap(piece.army)} Foot Soldier reached enemy Red Zone! Recruit a piece or earn Power Play?`, 'important');
+      showRecruitDialog(piece.army);
+    }
     return;
   }
 
@@ -1464,7 +1490,7 @@ function showRecruitOverlay(army, recruitable) {
   if (recruitable.length > 0) {
     html += `<p style="margin-bottom:6px;">Recruit a captured piece:</p>`;
     recruitable.forEach((p, i) => {
-      html += `<button onclick="doRecruit(${i})" style="margin:3px;padding:4px 10px;background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:1.1em;">${EMOJIS[p.army][p.type]}</button>`;
+      html += `<button onclick="doRecruit(${i})" title="${cap(p.army)} ${cap(p.type)}" style="margin:3px;padding:4px 6px;background:#27ae60;border:2px solid #1a8a50;border-radius:6px;cursor:pointer;line-height:0;"><img src="${IMAGES[p.army][p.type]}" style="width:36px;height:36px;object-fit:contain;filter:drop-shadow(0 0 2px rgba(0,0,0,0.6));display:block;"></button>`;
     });
   } else {
     html += `<p style="color:#aaa;margin-bottom:6px;">No captured pieces to recruit.</p>`;
@@ -2027,49 +2053,227 @@ function scheduleAiMove() {
   }, 350);
 }
 
+// AI AUTO-RECRUIT: when a foot soldier promotes, choose best action
+function aiAutoRecruit(army, row, col) {
+  const opp = army === 'gray' ? 'green' : 'gray';
+  const recruitable = capturedBy[opp].filter(p => p.army === army);
+  if (recruitable.length > 0) {
+    recruitable.sort((a,b) => (PIECE_VALUES[b.type]||0) - (PIECE_VALUES[a.type]||0));
+    const best = recruitable[0];
+    for (let i = 0; i < capturedBy[opp].length; i++) {
+      if (capturedBy[opp][i].army === army && capturedBy[opp][i].type === best.type) {
+        capturedBy[opp].splice(i, 1); break;
+      }
+    }
+    board[row][col] = mkPiece(best.type, army);
+    log(`AI recruits ${cap(best.type)} back!`, 'important');
+  } else if (powerPlayState[army] === 'used') {
+    powerPlayState[army] = 'available';
+    log(`AI earns a Power Play token!`, 'important');
+  } else {
+    log(`AI Foot Soldier promoted (nothing to recruit).`);
+  }
+}
+
+// AI NAVIGATE: teleport a ship in blue zone to better position
+function aiTryNavigate(army) {
+  if (navigateState[army] !== 'available') return { used: false };
+  const blueRow = army === 'gray' ? 1 : 6;
+  const ships = [];
+  for (let c = 0; c < 8; c++) {
+    const p = board[blueRow][c];
+    if (p && p.army === army && p.type === PIECE_TYPES.SHIP) ships.push([blueRow, c]);
+  }
+  if (!ships.length) return { used: false };
+  const baseScore = evaluateBoard(army);
+  let bestScore = -Infinity, bestFrom = null, bestTo = null;
+  for (const [sr, sc] of ships) {
+    for (let dc = 0; dc < 8; dc++) {
+      if (dc === sc || board[blueRow][dc]) continue;
+      const snap = cloneBoardState();
+      board[blueRow][dc] = board[blueRow][sc];
+      board[blueRow][sc] = null;
+      const score = evaluateBoard(army);
+      restoreBoardState(snap);
+      if (score > bestScore) { bestScore = score; bestFrom = [sr, sc]; bestTo = [blueRow, dc]; }
+    }
+  }
+  if (!bestFrom || bestScore <= baseScore + 25) return { used: false };
+  navigateState[army] = 'used';
+  const ship = board[bestFrom[0]][bestFrom[1]];
+  board[bestTo[0]][bestTo[1]] = ship;
+  board[bestFrom[0]][bestFrom[1]] = null;
+  log(`AI uses NAVIGATE! Ship moves to (${bestTo[0]},${bestTo[1]}).`, 'important');
+  return { used: true, from: [bestFrom], to: [bestTo] };
+}
+
+// AI DEFEND: reposition CiC + Officer out of danger
+function aiTryDefend(army) {
+  if (defendState[army] !== 'available') return { used: false };
+  if (!isInChallenge(army)) return { used: false };
+  if (!canDefend(army)) return { used: false };
+  const redRow = army === 'gray' ? 0 : 7;
+  const cicPos = findPiece(army, PIECE_TYPES.CIC);
+  const officers = findAllPieces(army, PIECE_TYPES.OFFICER).filter(([r]) => r === redRow);
+  if (!cicPos || !officers.length) return { used: false };
+  const open = [];
+  for (let c = 0; c < 8; c++) {
+    if (!board[redRow][c] || (board[redRow][c] && board[redRow][c].army === army)) open.push(c);
+  }
+  let bestScore = -Infinity, bestConfig = null;
+  for (let i = 0; i < open.length; i++) {
+    for (let j = 0; j < open.length; j++) {
+      if (i === j) continue;
+      const snap = cloneBoardState();
+      board[redRow][open[i]] = board[cicPos[0]][cicPos[1]];
+      board[redRow][open[j]] = board[officers[0][0]][officers[0][1]];
+      if (cicPos[1] !== open[i]) board[cicPos[0]][cicPos[1]] = null;
+      if (officers[0][1] !== open[j]) board[officers[0][0]][officers[0][1]] = null;
+      if (!isInChallenge(army)) {
+        const score = evaluateBoard(army);
+        if (score > bestScore) { bestScore = score; bestConfig = [open[i], open[j]]; }
+      }
+      restoreBoardState(snap);
+    }
+  }
+  if (!bestConfig) return { used: false };
+  defendState[army] = 'used';
+  const cicPiece = board[cicPos[0]][cicPos[1]];
+  const offPiece = board[officers[0][0]][officers[0][1]];
+  board[cicPos[0]][cicPos[1]] = null;
+  board[officers[0][0]][officers[0][1]] = null;
+  board[redRow][bestConfig[0]] = cicPiece;
+  board[redRow][bestConfig[1]] = offPiece;
+  log(`AI uses DEFEND! CiC and Officer repositioned in Red Zone.`, 'important');
+  const fromCells = [cicPos, officers[0]];
+  const toCells = [[redRow, bestConfig[0]], [redRow, bestConfig[1]]];
+  return { used: true, from: fromCells, to: toCells };
+}
+
+// AI POWER PLAY: greedy 3-move search, only trigger if gain >= threshold
+function aiTryPowerPlay(army) {
+  if (powerPlayState[army] !== 'available') return { used: false };
+  if (isInChallenge(army)) return { used: false };
+  const opp = army === 'gray' ? 'green' : 'gray';
+  const baseScore = evaluateBoard(army);
+  const moves1 = getAllMovesForArmy(army);
+  if (!moves1.length) return { used: false };
+  moves1.sort((a,b) => scoreMoveOrder(b) - scoreMoveOrder(a));
+  let bestTotal = -Infinity, bestSeq = null;
+  // Limit outer loop for performance
+  for (const m1 of moves1.slice(0, 12)) {
+    const snap1 = cloneBoardState();
+    applySimpleMove(m1);
+    if (!findPiece(opp, PIECE_TYPES.CIC)) { restoreBoardState(snap1); bestSeq = [m1]; bestTotal = 999999; break; }
+    const moves2 = getAllMovesForArmy(army).filter(m => !(m.fromR===m1.toR && m.fromC===m1.toC));
+    moves2.sort((a,b) => scoreMoveOrder(b) - scoreMoveOrder(a));
+    for (const m2 of moves2.slice(0, 10)) {
+      const snap2 = cloneBoardState();
+      applySimpleMove(m2);
+      if (!findPiece(opp, PIECE_TYPES.CIC)) {
+        restoreBoardState(snap2); restoreBoardState(snap1);
+        bestSeq = [m1, m2]; bestTotal = 999998; break;
+      }
+      const moves3 = getAllMovesForArmy(army).filter(m => !(m.fromR===m2.toR && m.fromC===m2.toC));
+      moves3.sort((a,b) => scoreMoveOrder(b) - scoreMoveOrder(a));
+      if (moves3.length) {
+        const snap3 = cloneBoardState();
+        applySimpleMove(moves3[0]);
+        const score3 = evaluateBoard(army);
+        restoreBoardState(snap3);
+        if (score3 > bestTotal) { bestTotal = score3; bestSeq = [m1, m2, moves3[0]]; }
+      }
+      restoreBoardState(snap2);
+    }
+    if (bestTotal >= 999998) break;
+    restoreBoardState(snap1);
+  }
+  if (!bestSeq || bestTotal < baseScore + 600) return { used: false };
+  powerPlayState[army] = 'used';
+  log(`AI activates POWER PLAY! (${bestSeq.length} moves)`, 'important');
+  const fromCells = [], toCells = [];
+  for (const mv of bestSeq) {
+    if (gameOver) break;
+    fromCells.push([mv.fromR, mv.fromC]);
+    toCells.push([mv.toR, mv.toC]);
+    const vm = getLegalMoves(mv.fromR, mv.fromC).find(m => m.row===mv.toR && m.col===mv.toC);
+    if (vm) {
+      const piece = board[mv.fromR][mv.fromC];
+      const target = board[mv.toR][mv.toC];
+      if (target) capturedBy[army].push({type:target.type, army:target.army});
+      if (target && target.type === PIECE_TYPES.CIC) {
+        board[mv.toR][mv.toC] = piece;
+        board[mv.fromR][mv.fromC] = null;
+        render(); endGame(army); return { used: true, from: fromCells, to: toCells, alreadyEndedTurn: true };
+      }
+      board[mv.toR][mv.toC] = piece;
+      board[mv.fromR][mv.fromC] = null;
+      piece.moved = true;
+      checkPlaneLink(army);
+      log(`AI Power Play: ${cap(piece.type)} to (${mv.toR},${mv.toC})`);
+    }
+  }
+  return { used: true, from: fromCells, to: toCells, alreadyEndedTurn: false };
+}
+
 function doAiMove() {
   document.getElementById('aiThinking').style.display = 'none';
   if (gameOver || currentTurn !== aiArmy) return;
 
-  // Easy: sometimes pick a random move
+  // --- Try special abilities (Medium/Hard only) ---
+  if (gameMode !== 'easy') {
+    const defendResult = aiTryDefend(aiArmy);
+    if (defendResult.used) {
+      lastAiMove = { from: defendResult.from, to: defendResult.to };
+      endTurn(); render(); updateUI(); return;
+    }
+    const navResult = aiTryNavigate(aiArmy);
+    if (navResult.used) {
+      lastAiMove = { from: navResult.from, to: navResult.to };
+      endTurn(); render(); updateUI(); return;
+    }
+  }
+
+  // Power Play: Hard always tries; Medium has 30% chance
+  const tryPP = (gameMode === 'hard') || (gameMode === 'medium' && Math.random() < 0.3);
+  if (tryPP && powerPlayState[aiArmy] === 'available' && !isInChallenge(aiArmy)) {
+    const ppResult = aiTryPowerPlay(aiArmy);
+    if (ppResult.used) {
+      lastAiMove = { from: ppResult.from, to: ppResult.to };
+      if (!ppResult.alreadyEndedTurn && !gameOver) endTurn();
+      render(); updateUI(); return;
+    }
+  }
+
+  // --- Standard single move ---
   const moves = getAllMovesForArmy(aiArmy);
   if (!moves.length) { endTurn(); return; }
 
   let chosen;
-
-  if (gameMode === 'easy') {
-    // 50% random, 50% one-ply best
-    if (Math.random() < 0.5) {
-      chosen = moves[Math.floor(Math.random() * moves.length)];
-    }
+  if (gameMode === 'easy' && Math.random() < 0.5) {
+    chosen = moves[Math.floor(Math.random() * moves.length)];
   }
-
   if (!chosen) {
     const depth = getAiDepth();
     let best = -Infinity;
     moves.sort((a,b) => scoreMoveOrder(b) - scoreMoveOrder(a));
-
     for (const mv of moves) {
       const snap = cloneBoardState();
       applySimpleMove(mv);
       const score = minimax(depth-1, -Infinity, Infinity, false, aiArmy);
       restoreBoardState(snap);
-      // Add tiny noise on easy to avoid perfect play
       const noise = gameMode === 'easy' ? (Math.random() * 60 - 30) : 0;
       if (score + noise > best) { best = score + noise; chosen = mv; }
     }
   }
-
   if (!chosen) chosen = moves[0];
 
-  // Execute the chosen move via the normal game path
-  const piece = board[chosen.fromR][chosen.fromC];
+  lastAiMove = { from: [[chosen.fromR, chosen.fromC]], to: [[chosen.toR, chosen.toC]] };
   const vm = getLegalMoves(chosen.fromR, chosen.fromC).find(m => m.row===chosen.toR && m.col===chosen.toC);
   if (vm) {
     selectPiece(chosen.fromR, chosen.fromC);
     executeMove(chosen.fromR, chosen.fromC, chosen.toR, chosen.toC, vm);
   } else {
-    // Fallback: just end turn
     endTurn();
   }
 }
