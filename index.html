@@ -2804,14 +2804,39 @@ function updateHistoryUI() {
 
 function undoMove() {
   if (undoUsedThisTurn) return;
-  if (moveHistory.length < 1) return;
   if (gameMode !== 'easy' && gameMode !== 'medium') return;
+  if (moveHistory.length < 1) return;
 
-  // Pop the last entry (the pre-move snapshot = state before that move)
-  const entry = moveHistory.pop();
-  applyFullSnapshot(entry.snap);
+  // In vs-AI mode we need to undo both the AI's last move AND the human's last move,
+  // so control returns to the human. Pop entries until we find one where the human moved.
+  let undoneDesc = '';
+  if (gameMode !== '2p') {
+    // Pop the AI's move (top of stack) if it's there
+    if (moveHistory.length >= 1 && moveHistory[moveHistory.length - 1].army === aiArmy) {
+      moveHistory.pop();
+    }
+    // Now pop the human's move
+    if (moveHistory.length >= 1 && moveHistory[moveHistory.length - 1].army === humanArmy) {
+      const entry = moveHistory.pop();
+      applyFullSnapshot(entry.snap);
+      undoneDesc = entry.desc;
+    } else if (moveHistory.length >= 1) {
+      // Fallback: just restore whatever is on top
+      const entry = moveHistory.pop();
+      applyFullSnapshot(entry.snap);
+      undoneDesc = entry.desc;
+    } else {
+      log('Nothing to undo.'); return;
+    }
+  } else {
+    // 2-player: just undo one move
+    const entry = moveHistory.pop();
+    applyFullSnapshot(entry.snap);
+    undoneDesc = entry.desc;
+  }
+
   undoUsedThisTurn = true;
-  log(`↩ Undo: ${entry.desc} reversed.`, 'important');
+  log(`↩ Undo: move reversed. Your turn again.`, 'important');
   render(); updateUI(); updateHistoryUI();
 }
 
