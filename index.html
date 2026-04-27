@@ -594,7 +594,7 @@
 
     <h3>⚡ Special Abilities <em>(once per game each)</em></h3>
     <ul>
-      <li><strong>⚡ Power Play</strong> — Move up to 3 different pieces in one turn (max 2 Army Officers). Cannot use while in Challenge.</li>
+      <li><strong>⚡ Power Play</strong> — Move up to 3 <em>different</em> pieces in one turn (max 2 Army Officers). Each piece may only be moved once during the Power Play. Cannot capture the enemy Commander-in-Chief — at most put them in Challenge. Cannot use while in Challenge.</li>
       <li><strong>🌊 Navigate</strong> — Instantly move one of your Navy pieces to any open square in your Blue Zone.</li>
       <li><strong>🛡️ Defend</strong> — When your CiC and an Army Officer are both in your Red Zone, reposition both anywhere within your Red Zone.</li>
     </ul>
@@ -997,9 +997,9 @@ function selectPiece(r, c) {
 function getLegalMoves(r, c) {
   const raw = getRawMoves(r, c, false);
   const piece = board[r][c];
+  const opp = piece.army === 'gray' ? 'green' : 'gray';
   // Filter moves that would leave own CiC in challenge
-  return raw.filter(m => {
-    // Simulate move
+  let legal = raw.filter(m => {
     const saved = board[m.row][m.col];
     board[m.row][m.col] = piece;
     board[r][c] = null;
@@ -1008,6 +1008,14 @@ function getLegalMoves(r, c) {
     board[m.row][m.col] = saved;
     return !inCheck;
   });
+  // During Power Play, cannot capture the enemy Commander-in-Chief
+  if (mode === 'powerplay') {
+    legal = legal.filter(m => {
+      const target = board[m.row][m.col];
+      return !(target && target.type === PIECE_TYPES.CIC && target.army === opp);
+    });
+  }
+  return legal;
 }
 
 function getRawMoves(r, c, captureOnly) {
@@ -1370,6 +1378,7 @@ function activatePowerPlay(army) {
     army,
     movesLeft: 3,
     moved: [],
+    movedFromSquares: [],
     captureUsed: false,
     officerCount: 0,
     footCount: 0,
@@ -1391,6 +1400,11 @@ function showPPInfo() {
 function handlePowerPlaySelect(r, c) {
   const piece = board[r][c];
   if (!piece || piece.army !== currentTurn) return;
+
+  // Cannot re-move a piece that already moved this Power Play (tracked by destination)
+  if (ppState.moved.some(([mr, mc]) => mr === r && mc === c)) {
+    log('Power Play: Each piece can only be moved once per Power Play.'); return;
+  }
 
   // CiC is always allowed additionally
   if (piece.type === PIECE_TYPES.CIC) {
@@ -1863,8 +1877,12 @@ const TUT_STEPS = [
     title: 'Special Ability — Power Play',
     body: `Your biggest tactical weapon. Use it <strong>once per game</strong>.<br><br>
            Press <strong>⚡ POWER PLAY</strong> on your turn, then move up to <em>3 different pieces</em> in that single turn.<br><br>
-           <strong>Limits:</strong> No more than 2 Army Officers in one Power Play. Cannot use while in Challenge.<br><br>
-           <em>Tip: Save Power Play for a decisive moment — a coordinated 3-piece attack on the enemy CiC can be game-ending.</em>`
+           <strong>Limits:</strong><br>
+           &bull; No more than 2 Army Officers in one Power Play.<br>
+           &bull; Each piece may only be moved <em>once</em> during the Power Play — you can't move the same piece twice.<br>
+           &bull; Cannot capture the enemy Commander-in-Chief — at most put them in Challenge.<br>
+           &bull; Cannot use while in Challenge.<br><br>
+           <em>Tip: Save Power Play for a decisive moment — a coordinated 3-piece attack that puts the enemy CiC in Challenge can completely turn the tide!</em>`
   },
   {
     icon: '🌊',
