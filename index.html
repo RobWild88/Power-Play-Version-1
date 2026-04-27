@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Power Play © 1994 Nicholas Kapano & Robinson Kapano</title>
 <style>
   :root {
@@ -417,6 +417,69 @@
   }
 
 
+  /* ===== MOBILE / RESPONSIVE ===== */
+  @media (max-width: 600px) {
+    h1 { font-size: 1.1em; }
+    .help-bar { gap: 5px; flex-wrap: wrap; }
+    .help-btn { padding: 5px 9px; font-size: 0.72em; }
+    .game-container { gap: 6px; }
+    .panel { min-width: 130px; padding: 6px; font-size: 0.7em; }
+    .panel h3 { font-size: 0.88em; }
+    #board {
+      grid-template-columns: repeat(8, 40px);
+      grid-template-rows: repeat(8, 40px);
+    }
+    .cell { width: 40px; height: 40px; font-size: 18px; }
+    .piece { width: 34px; height: 34px; }
+    .piece-flyer { width: 34px; height: 34px; }
+    .capture-ghost { width: 34px; height: 34px; }
+    .special-btn { font-size: 0.75em; padding: 4px 5px; }
+    .captured-list img { width: 20px; height: 20px; }
+    .log-box { height: 80px; font-size: 0.68em; }
+    .history-section { max-width: 100%; }
+    .options-bar { font-size: 0.75em; }
+  }
+  @media (max-width: 400px) {
+    #board {
+      grid-template-columns: repeat(8, 34px);
+      grid-template-rows: repeat(8, 34px);
+    }
+    .cell { width: 34px; height: 34px; }
+    .piece { width: 28px; height: 28px; }
+    .panel { min-width: 110px; font-size: 0.65em; }
+  }
+
+  /* ===== ARMY COLOR THEME ===== */
+  .color-swatch-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .color-swatch {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 3px solid #555;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.selected { border-color: #f39c12; box-shadow: 0 0 8px rgba(243,156,18,0.7); }
+
+  /* ===== SOUND TOGGLE ===== */
+  .sound-toggle {
+    font-size: 0.78em;
+    color: #aaa;
+    cursor: pointer;
+    padding: 3px 8px;
+    border: 1px solid #444;
+    border-radius: 12px;
+    background: #16213e;
+    user-select: none;
+  }
+  .sound-toggle.muted { color: #555; border-color: #333; }
+
   /* ===== MOVE HISTORY ===== */
   .history-section {
     width: 100%;
@@ -572,6 +635,7 @@
 
 <div class="options-bar">
   <label><input type="checkbox" id="bombingOpt"> Enable Bombing Missions (optional rules)</label>
+  <span id="soundToggle" class="sound-toggle" onclick="toggleSound()">🔊 Sound On</span>
 </div>
 
 <div class="game-container">
@@ -677,8 +741,8 @@
   <div class="modal-box" style="max-width:480px;text-align:center;">
     <h2 style="margin-bottom:16px;">⚙️ NEW GAME</h2>
 
-    <h3 style="margin-bottom:8px;">Choose Your Army</h3>
-    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:18px;">
+    <h3 style="margin-bottom:8px;">Choose Your Army (Gray side)</h3>
+    <div style="display:flex;gap:12px;justify-content:center;margin-bottom:10px;">
       <div id="armyGray" class="army-choice selected" onclick="selectArmy('gray')">
         <img src="PowerPlayPieces/GrayCommanderInChief.png" style="width:48px;height:48px;object-fit:contain;" draggable="false">
         <div style="margin-top:4px;font-size:0.85em;font-weight:bold;">🪖 GRAY</div>
@@ -687,6 +751,24 @@
         <img src="PowerPlayPieces/GreenCommanderInChief.png" style="width:48px;height:48px;object-fit:contain;" draggable="false">
         <div style="margin-top:4px;font-size:0.85em;font-weight:bold;">🌿 GREEN</div>
       </div>
+    </div>
+
+    <h3 style="margin-bottom:6px;">🎨 Army 1 Color (Gray pieces)</h3>
+    <div class="color-swatch-row" id="army1ColorRow">
+      <div class="color-swatch selected" data-color="gray"   style="background:#888;"    onclick="selectArmyColor(1,'gray')"   title="Gray"></div>
+      <div class="color-swatch"          data-color="red"    style="background:#c0392b;" onclick="selectArmyColor(1,'red')"    title="Red"></div>
+      <div class="color-swatch"          data-color="blue"   style="background:#2980b9;" onclick="selectArmyColor(1,'blue')"   title="Blue"></div>
+      <div class="color-swatch"          data-color="yellow" style="background:#f1c40f;" onclick="selectArmyColor(1,'yellow')" title="Yellow"></div>
+      <div class="color-swatch"          data-color="purple" style="background:#8e44ad;" onclick="selectArmyColor(1,'purple')" title="Purple"></div>
+    </div>
+
+    <h3 style="margin-bottom:6px;">🎨 Army 2 Color (Green pieces)</h3>
+    <div class="color-swatch-row" id="army2ColorRow">
+      <div class="color-swatch selected" data-color="green"  style="background:#27ae60;" onclick="selectArmyColor(2,'green')"  title="Green"></div>
+      <div class="color-swatch"          data-color="red"    style="background:#c0392b;" onclick="selectArmyColor(2,'red')"    title="Red"></div>
+      <div class="color-swatch"          data-color="blue"   style="background:#2980b9;" onclick="selectArmyColor(2,'blue')"   title="Blue"></div>
+      <div class="color-swatch"          data-color="yellow" style="background:#f1c40f;" onclick="selectArmyColor(2,'yellow')" title="Yellow"></div>
+      <div class="color-swatch"          data-color="purple" style="background:#8e44ad;" onclick="selectArmyColor(2,'purple')" title="Purple"></div>
     </div>
 
     <h3 style="margin-bottom:8px;">Game Mode</h3>
@@ -846,6 +928,30 @@ let replayActive = false;
 let replayPaused = false;
 let replayStepTimer = null;
 
+// ---- Sound ----
+let soundEnabled = true;
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// Army color themes — each has a CSS filter tint applied to piece images
+// Values: hue-rotate + saturation shifts via CSS filter
+const ARMY_COLOR_FILTERS = {
+  gray:   'none',
+  green:  'none',
+  red:    'sepia(1) saturate(5) hue-rotate(310deg) brightness(0.9)',
+  blue:   'sepia(1) saturate(4) hue-rotate(185deg) brightness(1.0)',
+  yellow: 'sepia(1) saturate(5) hue-rotate(10deg) brightness(1.1)',
+  purple: 'sepia(1) saturate(4) hue-rotate(240deg) brightness(0.9)',
+};
+// Which color is picked for each "slot" (slot 1 = gray army, slot 2 = green army)
+let army1Color = 'gray';
+let army2Color = 'green';
+let setupArmy1Color = 'gray';
+let setupArmy2Color = 'green';
+
 function mkPiece(type, army) { return { type, army, moved: false }; }
 
 function initGame() {
@@ -935,6 +1041,10 @@ function render() {
         img.src = IMAGES[piece.army][piece.type];
         img.alt = piece.army + ' ' + piece.type;
         img.draggable = false;
+        // Apply army color filter
+        const colorKey = piece.army === 'gray' ? army1Color : army2Color;
+        const filt = ARMY_COLOR_FILTERS[colorKey] || 'none';
+        if (filt !== 'none') img.style.filter = filt;
         // Check if linked
         const linked = planeLink[piece.army].linked &&
           piece.type === PIECE_TYPES.PLANE;
@@ -1059,9 +1169,12 @@ function updateUI() {
 
   // Captured lists — render actual piece images
   function capturedHTML(pieces) {
-    return pieces.map(p =>
-      `<img src="${IMAGES[p.army][p.type]}" title="${cap(p.army)} ${cap(p.type)}" style="width:26px;height:26px;object-fit:contain;filter:drop-shadow(0 0 2px rgba(0,0,0,0.7));vertical-align:middle;margin:1px;">`
-    ).join('');
+    return pieces.map(p => {
+      const colorKey = p.army === 'gray' ? army1Color : army2Color;
+      const filt = ARMY_COLOR_FILTERS[colorKey] || 'none';
+      const filterStr = filt !== 'none' ? filt : 'drop-shadow(0 0 2px rgba(0,0,0,0.7))';
+      return `<img src="${IMAGES[p.army][p.type]}" title="${cap(p.army)} ${cap(p.type)}" style="width:26px;height:26px;object-fit:contain;filter:${filterStr};vertical-align:middle;margin:1px;">`;
+    }).join('');
   }
   document.getElementById('grayCaptured').innerHTML  = capturedHTML(capturedBy.gray);
   document.getElementById('greenCaptured').innerHTML = capturedHTML(capturedBy.green);
@@ -1420,6 +1533,9 @@ function executeMove(fromR, fromC, toR, toC, vm) {
   board[fromR][fromC] = null;
   piece.moved = true;
 
+  // Play move sound
+  playMoveSound(piece.type);
+
   log(`${cap(piece.army)} ${cap(piece.type)} moves to (${toR},${toC})`);
 
   // Check plane link
@@ -1464,6 +1580,7 @@ function executeMove(fromR, fromC, toR, toC, vm) {
   // Check challenge announcement
   if (isInChallenge(opp)) {
     log(`CHALLENGE! ${cap(piece.army)} threatens the ${cap(opp)} Commander-in-Chief!`, 'challenge-log');
+    playChallengeSound();
   }
 
   endTurn();
@@ -1539,6 +1656,7 @@ function endGame(winner) {
   document.getElementById('gameOver').classList.add('show');
   log(`GAME OVER — ${cap(winner)} Army wins!`, 'important');
   updateHistoryUI();
+  setTimeout(playVictorySound, 300);
   // Show replay button only if there are moves to replay
   const replayBtn = document.getElementById('replayBtn');
   if (replayBtn) replayBtn.style.display = moveHistory.length > 0 ? '' : 'none';
@@ -2164,12 +2282,22 @@ function tutNav(dir) {
 function openSetup() {
   setupArmy = humanArmy;
   setupMode = gameMode;
+  setupArmy1Color = army1Color;
+  setupArmy2Color = army2Color;
   ['gray','green'].forEach(a => {
     document.getElementById('army'+cap(a)).classList.toggle('selected', a===setupArmy);
   });
   ['2p','easy','medium','hard'].forEach(m => {
     const el = document.getElementById('mode'+cap(m==='2p'?'2p':m));
     if(el) el.classList.toggle('selected', m===setupMode);
+  });
+  // Restore color swatch selections
+  [1,2].forEach(slot => {
+    const cur = slot === 1 ? setupArmy1Color : setupArmy2Color;
+    const row = document.getElementById(`army${slot}ColorRow`);
+    if (row) row.querySelectorAll('.color-swatch').forEach(sw => {
+      sw.classList.toggle('selected', sw.dataset.color === cur);
+    });
   });
   document.getElementById('setupModal').classList.add('show');
 }
@@ -2188,9 +2316,11 @@ function selectMode(m) {
 }
 function startNewGame() {
   closeModal('setupModal');
-  gameMode  = setupMode;
-  humanArmy = setupArmy;
-  aiArmy    = humanArmy === 'gray' ? 'green' : 'gray';
+  gameMode   = setupMode;
+  humanArmy  = setupArmy;
+  aiArmy     = humanArmy === 'gray' ? 'green' : 'gray';
+  army1Color = setupArmy1Color;
+  army2Color = setupArmy2Color;
   initGame();
 }
 
@@ -2488,14 +2618,18 @@ function aiTryPowerPlay(army) {
 // ===================== PIECE SLIDE ANIMATION =====================
 // Slides a piece image from one board cell to another, calls onDone when complete.
 // Does NOT modify board state — caller does that in onDone.
-function animatePieceSlide(fromR, fromC, toR, toC, imgSrc, onDone) {
-  const CELL = 64;
+function animatePieceSlide(fromR, fromC, toR, toC, imgSrc, onDone, pieceArmy) {
+  // Determine cell size responsively
   const boardEl = document.getElementById('board');
   const boardRect = boardEl.getBoundingClientRect();
-  const fromX = boardRect.left + fromC * CELL + (CELL - 54) / 2;
-  const fromY = boardRect.top  + fromR * CELL + (CELL - 54) / 2;
-  const toX   = boardRect.left + toC   * CELL + (CELL - 54) / 2;
-  const toY   = boardRect.top  + toR   * CELL + (CELL - 54) / 2;
+  const CELL = boardRect.width / 8;
+  const PIECE_SIZE = CELL * 0.84;
+  const offset = (CELL - PIECE_SIZE) / 2;
+
+  const fromX = boardRect.left + fromC * CELL + offset;
+  const fromY = boardRect.top  + fromR * CELL + offset;
+  const toX   = boardRect.left + toC   * CELL + offset;
+  const toY   = boardRect.top  + toR   * CELL + offset;
 
   // Temporarily hide the piece at source so it doesn't show under the flyer
   const cells = document.querySelectorAll('#board .cell');
@@ -2506,8 +2640,16 @@ function animatePieceSlide(fromR, fromC, toR, toC, imgSrc, onDone) {
   const flyer = document.createElement('img');
   flyer.className = 'piece-flyer';
   flyer.src = imgSrc;
+  flyer.style.width  = PIECE_SIZE + 'px';
+  flyer.style.height = PIECE_SIZE + 'px';
   flyer.style.left = fromX + 'px';
   flyer.style.top  = fromY + 'px';
+  // Apply color filter if army known
+  if (pieceArmy) {
+    const colorKey = pieceArmy === 'gray' ? army1Color : army2Color;
+    const filt = ARMY_COLOR_FILTERS[colorKey] || 'none';
+    if (filt !== 'none') flyer.style.filter = filt;
+  }
   document.body.appendChild(flyer);
 
   // Two rAF frames to let the browser paint the starting position before transitioning
@@ -2680,6 +2822,7 @@ function doAiMove() {
 // ===================== CAPTURE ANIMATION =====================
 function playCaptureAnimation(targetEl, targetPieceSrc, capturedArmy) {
   if (!targetEl) return;
+  playCaptureSound();
   const rect = targetEl.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top  + rect.height / 2;
@@ -3094,8 +3237,194 @@ function replayFinish() {
   }, 1200);
 }
 
+// ===================== SOUND ENGINE =====================
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  const el = document.getElementById('soundToggle');
+  el.textContent = soundEnabled ? '🔊 Sound On' : '🔇 Sound Off';
+  el.classList.toggle('muted', !soundEnabled);
+}
+
+// Core tone generator using Web Audio API
+function playTone(opts) {
+  if (!soundEnabled) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const { type='sine', freq=440, freq2, duration=0.18, volume=0.18,
+            attack=0.01, decay=0.05, noiseAmt=0, freqSlide=0 } = opts;
+
+    const gainNode = ctx.createGain();
+    gainNode.connect(ctx.destination);
+    const now = ctx.currentTime;
+    gainNode.gain.setValueAtTime(0, now);
+    gainNode.gain.linearRampToValueAtTime(volume, now + attack);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, now);
+    if (freqSlide) osc.frequency.linearRampToValueAtTime(freq + freqSlide, now + duration);
+    if (freq2) osc.frequency.setValueAtTime(freq2, now + duration * 0.4);
+    osc.connect(gainNode);
+    osc.start(now);
+    osc.stop(now + duration + 0.05);
+
+    // Optional noise layer (for mechanical/environmental feel)
+    if (noiseAmt > 0) {
+      const bufSize = ctx.sampleRate * duration;
+      const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+      const noise = ctx.createBufferSource();
+      noise.buffer = buf;
+      const noiseFilter = ctx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = freq;
+      noiseFilter.Q.value = 1.5;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0, now);
+      noiseGain.gain.linearRampToValueAtTime(noiseAmt, now + attack);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      noise.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noise.start(now);
+      noise.stop(now + duration + 0.05);
+    }
+  } catch(e) { /* silent fail */ }
+}
+
+// Per-piece move sounds
+function playMoveSound(pieceType) {
+  if (!soundEnabled) return;
+  switch(pieceType) {
+    case 'foot':
+      // Crisp mechanical click
+      playTone({ type:'square', freq:800, duration:0.07, volume:0.12, attack:0.002, decay:0.04, noiseAmt:0.06 });
+      break;
+    case 'officer':
+      // Low rumbling tank — two layered tones
+      playTone({ type:'sawtooth', freq:90,  duration:0.25, volume:0.10, attack:0.03, noiseAmt:0.08 });
+      setTimeout(()=>playTone({ type:'square', freq:55, duration:0.18, volume:0.07, attack:0.02, noiseAmt:0.05 }), 60);
+      break;
+    case 'plane':
+      // Rising engine whine
+      playTone({ type:'sawtooth', freq:320, freqSlide:480, duration:0.30, volume:0.10, attack:0.04, noiseAmt:0.03 });
+      break;
+    case 'ship':
+      // Low foghorn-style thud
+      playTone({ type:'sine', freq:110, freq2:80, duration:0.35, volume:0.13, attack:0.05, noiseAmt:0.04 });
+      break;
+    case 'general':
+      // Commanding double-beat
+      playTone({ type:'triangle', freq:260, duration:0.15, volume:0.12, attack:0.01 });
+      setTimeout(()=>playTone({ type:'triangle', freq:220, duration:0.20, volume:0.10, attack:0.01 }), 100);
+      break;
+    case 'cic':
+      // Authoritative low tone
+      playTone({ type:'sine', freq:180, duration:0.28, volume:0.14, attack:0.03 });
+      break;
+    default:
+      playTone({ type:'sine', freq:500, duration:0.10, volume:0.10 });
+  }
+}
+
+function playCaptureSound() {
+  if (!soundEnabled) return;
+  // Explosive burst — fast noise + descending tone
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+
+    // Noise burst
+    const bufSize = Math.floor(ctx.sampleRate * 0.35);
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const nf = ctx.createBiquadFilter();
+    nf.type = 'lowpass'; nf.frequency.value = 800;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.28, now);
+    ng.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    noise.connect(nf); nf.connect(ng); ng.connect(ctx.destination);
+    noise.start(now); noise.stop(now + 0.38);
+
+    // Low boom
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(40, now + 0.28);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(0.22, now);
+    og.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
+    osc.connect(og); og.connect(ctx.destination);
+    osc.start(now); osc.stop(now + 0.32);
+  } catch(e) {}
+}
+
+function playVictorySound() {
+  if (!soundEnabled) return;
+  // Ascending fanfare — 5 notes
+  const notes = [523, 659, 784, 1047, 1319]; // C E G C E
+  notes.forEach((freq, i) => {
+    setTimeout(() => {
+      playTone({ type:'triangle', freq, duration:0.28, volume:0.16, attack:0.02 });
+      if (i === notes.length - 1) {
+        // Final long sustain
+        setTimeout(()=>playTone({ type:'sine', freq:1047, duration:0.6, volume:0.14, attack:0.05 }), 60);
+      }
+    }, i * 140);
+  });
+}
+
+function playChallengeSound() {
+  if (!soundEnabled) return;
+  // Urgent warning pulse
+  playTone({ type:'square', freq:880, duration:0.10, volume:0.13, attack:0.005 });
+  setTimeout(()=>playTone({ type:'square', freq:880, duration:0.10, volume:0.13, attack:0.005 }), 160);
+}
+
+// Hook sounds into executeMove — inject after board changes
+// (Called at the right moments below)
+
+// ===================== ARMY COLOR THEMES =====================
+function selectArmyColor(slot, color) {
+  const rowId = slot === 1 ? 'army1ColorRow' : 'army2ColorRow';
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  row.querySelectorAll('.color-swatch').forEach(sw => {
+    sw.classList.toggle('selected', sw.dataset.color === color);
+  });
+  if (slot === 1) setupArmy1Color = color;
+  else setupArmy2Color = color;
+}
+
+// ===================== MOBILE TOUCH SUPPORT =====================
+// Convert touch events on the board to cell clicks
+function initTouchControls() {
+  const boardEl = document.getElementById('board');
+  if (!boardEl) return;
+
+  boardEl.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (!target) return;
+    const cell = target.closest('.cell');
+    if (!cell) return;
+    const r = parseInt(cell.dataset.r, 10);
+    const c = parseInt(cell.dataset.c, 10);
+    if (!isNaN(r) && !isNaN(c)) onCellClick(r, c);
+  }, { passive: false });
+}
+
 // ===================== INIT =====================
 initGame();
+initTouchControls();
 </script>
 </body>
 </html>
