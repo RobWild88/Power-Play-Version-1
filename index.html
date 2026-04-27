@@ -642,7 +642,7 @@
 
   <!-- LEFT PANEL: Gray Army -->
   <div class="panel" id="grayPanel">
-    <h3>🪖 GRAY ARMY</h3>
+    <h3 id="grayPanelTitle">🪖 GRAY ARMY</h3>
     <div class="turn-indicator gray-turn" id="grayTurnIndicator">YOUR TURN</div>
     <div class="challenge-alert" id="grayChallengeAlert">⚠️ CHALLENGE!</div>
     <div class="status-row"><span>Power Play:</span> <span id="grayPPStatus">✅ Available</span></div>
@@ -655,10 +655,10 @@
     <button class="special-btn defend"     id="grayDefBtn"  onclick="activateDefend('gray')">🛡️ DEFEND</button>
     <div class="power-play-mode-info" id="grayPPInfo"></div>
     <hr style="border-color:#333; margin:6px 0">
-    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured by Gray:</div>
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;" id="grayCapturedLabel">Captured by Gray:</div>
     <div class="captured-list" id="grayCaptured"></div>
     <hr style="border-color:#333; margin:6px 0">
-    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured from Gray:</div>
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;" id="grayLostLabel">Captured from Gray:</div>
     <div class="captured-list" id="grayLost"></div>
   </div>
 
@@ -691,7 +691,7 @@
 
   <!-- RIGHT PANEL: Green Army -->
   <div class="panel" id="greenPanel">
-    <h3>🌿 GREEN ARMY</h3>
+    <h3 id="greenPanelTitle">🌿 GREEN ARMY</h3>
     <div class="turn-indicator green-turn" id="greenTurnIndicator" style="display:none">YOUR TURN</div>
     <div class="challenge-alert" id="greenChallengeAlert">⚠️ CHALLENGE!</div>
     <div class="status-row"><span>Power Play:</span> <span id="greenPPStatus">✅ Available</span></div>
@@ -704,10 +704,10 @@
     <button class="special-btn defend"     id="greenDefBtn"  onclick="activateDefend('green')">🛡️ DEFEND</button>
     <div class="power-play-mode-info" id="greenPPInfo"></div>
     <hr style="border-color:#333; margin:6px 0">
-    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured by Green:</div>
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;" id="greenCapturedLabel">Captured by Green:</div>
     <div class="captured-list" id="greenCaptured"></div>
     <hr style="border-color:#333; margin:6px 0">
-    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;">Captured from Green:</div>
+    <div style="font-size:0.75em;color:#aaa;margin-bottom:3px;" id="greenLostLabel">Captured from Green:</div>
     <div class="captured-list" id="greenLost"></div>
   </div>
 
@@ -936,6 +936,34 @@ function getAudioCtx() {
   return audioCtx;
 }
 
+// Display names and emojis for each color
+const COLOR_NAMES  = { gray:'Gray', green:'Green', red:'Red', blue:'Blue', yellow:'Yellow', purple:'Purple' };
+const COLOR_EMOJIS = { gray:'🪖', green:'🌿', red:'🔴', blue:'🔵', yellow:'🟡', purple:'🟣' };
+
+// Return the display name for an army slot ('gray' internal = army1, 'green' internal = army2)
+function armyName(internalArmy) {
+  if (internalArmy === 'gray')  return COLOR_NAMES[army1Color]  || 'Gray';
+  if (internalArmy === 'green') return COLOR_NAMES[army2Color]  || 'Green';
+  return cap(internalArmy);
+}
+function armyEmoji(internalArmy) {
+  if (internalArmy === 'gray')  return COLOR_EMOJIS[army1Color]  || '🪖';
+  if (internalArmy === 'green') return COLOR_EMOJIS[army2Color]  || '🌿';
+  return '';
+}
+
+function updatePanelLabels() {
+  const g = armyName('gray'),  ge = armyEmoji('gray');
+  const n = armyName('green'), ne = armyEmoji('green');
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set('grayPanelTitle',    `${ge} ${g.toUpperCase()} ARMY`);
+  set('greenPanelTitle',   `${ne} ${n.toUpperCase()} ARMY`);
+  set('grayCapturedLabel', `Captured by ${g}:`);
+  set('grayLostLabel',     `Captured from ${g}:`);
+  set('greenCapturedLabel',`Captured by ${n}:`);
+  set('greenLostLabel',    `Captured from ${n}:`);
+}
+
 // Army color themes — each has a CSS filter tint applied to piece images
 // Values: hue-rotate + saturation shifts via CSS filter
 const ARMY_COLOR_FILTERS = {
@@ -998,12 +1026,12 @@ function initGame() {
   document.getElementById('gameOver').classList.remove('show');
   document.getElementById('diceSection').style.display = 'none';
   clearLog();
+  updatePanelLabels();
   if (gameMode === '2p') {
-    log('Game started! Gray Army moves first.', 'important');
+    log(`Game started! ${armyName('gray')} Army moves first.`, 'important');
   } else {
     const diffLabel = gameMode.charAt(0).toUpperCase() + gameMode.slice(1);
-    const youAre = humanArmy === 'gray' ? 'Gray' : 'Green';
-    log(`Game started! You play as ${youAre} Army vs AI (${diffLabel}). Gray moves first.`, 'important');
+    log(`Game started! You play as ${armyName(humanArmy)} Army vs AI (${diffLabel}). ${armyName('gray')} moves first.`, 'important');
   }
   render();
   updateUI();
@@ -1196,8 +1224,9 @@ function updateUI() {
     document.getElementById(`${currentTurn}DefBtn`).classList.add('active');
   }
 
-  // Update history panel
+  // Update history panel & panel labels
   updateHistoryUI();
+  updatePanelLabels();
 }
 
 function canDefend(army) {
@@ -1495,8 +1524,8 @@ function executeMove(fromR, fromC, toR, toC, vm) {
   const isFirstPPMove = mode === 'powerplay' && ppState && ppState.moved.length === 0;
   const isNormalMove  = mode !== 'powerplay';
   if (isNormalMove || isFirstPPMove) {
-    const targetName = target ? ` captures ${cap(target.army)} ${cap(target.type)}` : `→ (${toR},${toC})`;
-    const desc = `${cap(piece.army)} ${cap(piece.type)}${targetName}`;
+    const targetName = target ? ` captures ${armyName(target.army)} ${cap(target.type)}` : `→ (${toR},${toC})`;
+    const desc = `${armyName(piece.army)} ${cap(piece.type)}${targetName}`;
     pushMoveSnapshot(desc, piece.army);
   }
 
@@ -1512,7 +1541,7 @@ function executeMove(fromR, fromC, toR, toC, vm) {
 
   if (target) {
     capturedBy[piece.army].push({type:target.type, army:target.army});
-    log(`${cap(piece.army)} ${cap(piece.type)} captures ${cap(target.army)} ${cap(target.type)}!`, 'important');
+    log(`${armyName(piece.army)} ${cap(piece.type)} captures ${armyName(target.army)} ${cap(target.type)}!`, 'important');
     // Capture animation — fire before board updates so cell position is correct
     const capCells = document.querySelectorAll('#board .cell');
     const capIdx = toR * 8 + toC;
@@ -1536,7 +1565,7 @@ function executeMove(fromR, fromC, toR, toC, vm) {
   // Play move sound
   playMoveSound(piece.type);
 
-  log(`${cap(piece.army)} ${cap(piece.type)} moves to (${toR},${toC})`);
+  log(`${armyName(piece.army)} ${cap(piece.type)} moves to (${toR},${toC})`);
 
   // Check plane link
   checkPlaneLink(piece.army);
@@ -1553,7 +1582,7 @@ function executeMove(fromR, fromC, toR, toC, vm) {
       mode = 'normal';
       endTurn();
     } else {
-      log(`${cap(piece.army)} Foot Soldier reached enemy Red Zone! Recruit a piece or earn Power Play?`, 'important');
+      log(`${armyName(piece.army)} Foot Soldier reached enemy Red Zone! Recruit a piece or earn Power Play?`, 'important');
       showRecruitDialog(piece.army);
     }
     return;
@@ -1579,7 +1608,7 @@ function executeMove(fromR, fromC, toR, toC, vm) {
 
   // Check challenge announcement
   if (isInChallenge(opp)) {
-    log(`CHALLENGE! ${cap(piece.army)} threatens the ${cap(opp)} Commander-in-Chief!`, 'challenge-log');
+    log(`CHALLENGE! ${armyName(piece.army)} threatens the ${armyName(opp)} Commander-in-Chief!`, 'challenge-log');
     playChallengeSound();
   }
 
@@ -1594,11 +1623,11 @@ function checkBreakOwnBarrier(fromR, fromC, toR, toC, army) {
     if (toR === barrier.row && toC >= barrier.minC && toC <= barrier.maxC &&
         board[toR][toC] === null) {
       // Will place here — check if that breaks barrier
-      log(`${cap(army)} barrier broken!`);
+      log(`${armyName(army)} barrier broken!`);
     }
   } else if (barrier.type === 'col') {
     if (toC === barrier.col && toR >= barrier.minR && toR <= barrier.maxR) {
-      log(`${cap(army)} barrier broken!`);
+      log(`${armyName(army)} barrier broken!`);
     }
   }
 }
@@ -1611,7 +1640,7 @@ function endTurn() {
     planeLink[opp].countdown--;
     if (planeLink[opp].countdown <= 0) {
       planeLink[opp].linked = false;
-      log(`${cap(opp)} plane link expired.`);
+      log(`${armyName(opp)} plane link expired.`);
     }
   }
 
@@ -1651,10 +1680,10 @@ function hasAnyLegalMove(army) {
 
 function endGame(winner) {
   gameOver = true;
-  document.getElementById('gameOverTitle').textContent = `${cap(winner)} Army Wins!`;
-  document.getElementById('gameOverMsg').textContent = `The ${cap(winner === 'gray' ? 'green' : 'gray')} Commander-in-Chief has been captured.`;
+  document.getElementById('gameOverTitle').textContent = `${armyName(winner)} Army Wins!`;
+  document.getElementById('gameOverMsg').textContent = `The ${armyName(winner === 'gray' ? 'green' : 'gray')} Commander-in-Chief has been captured.`;
   document.getElementById('gameOver').classList.add('show');
-  log(`GAME OVER — ${cap(winner)} Army wins!`, 'important');
+  log(`GAME OVER — ${armyName(winner)} Army wins!`, 'important');
   updateHistoryUI();
   setTimeout(playVictorySound, 300);
   // Show replay button only if there are moves to replay
@@ -1672,7 +1701,7 @@ function checkPlaneLink(army) {
   const canReach = lMoves.some(([dr,dc]) => a[0]+dr===b[0] && a[1]+dc===b[1]);
   if (canReach && !planeLink[army].linked) {
     planeLink[army] = { linked: true, countdown: 3 };
-    log(`${cap(army)} planes in L-Formation — LINKED! Invincible for 3 opponent turns.`, 'important');
+    log(`${armyName(army)} planes in L-Formation — LINKED! Invincible for 3 opponent turns.`, 'important');
   } else if (!canReach) {
     planeLink[army].linked = false;
   }
@@ -1696,7 +1725,7 @@ function activatePowerPlay(army) {
     cicMoved: false
   };
   powerPlayState[army] = 'used';
-  log(`${cap(army)} activates POWER PLAY! Move up to 3 pieces.`, 'important');
+  log(`${armyName(army)} activates POWER PLAY! Move up to 3 pieces.`, 'important');
   showPPInfo();
   selected=null; validMoves=[]; render(); updateUI();
 }
@@ -1743,10 +1772,10 @@ function handlePowerPlaySelect(r, c) {
 }
 
 function endPowerPlay() {
-  log(`${cap(ppState.army)} Power Play complete.`);
+  log(`${armyName(ppState.army)} Power Play complete.`);
   const opp = ppState.army==='gray'?'green':'gray';
   if (isInChallenge(opp)) {
-    log(`CHALLENGE! ${cap(ppState.army)} threatens the ${cap(opp)} Commander-in-Chief!`, 'challenge-log');
+    log(`CHALLENGE! ${armyName(ppState.army)} threatens the ${armyName(opp)} Commander-in-Chief!`, 'challenge-log');
   }
   ppState = null;
   endTurn();
@@ -1767,7 +1796,7 @@ function activateNavigate(army) {
 
   mode = 'navigate';
   navigateState[army] = 'used';
-  log(`${cap(army)} activates NAVIGATE! Click a Ship in your Blue Zone, then its destination.`, 'important');
+  log(`${armyName(army)} activates NAVIGATE! Click a Ship in your Blue Zone, then its destination.`, 'important');
   selected=null; validMoves=[]; render(); updateUI();
 }
 
@@ -1802,7 +1831,7 @@ function handleNavigateClick(r, c) {
     board[r][c] = null;
     log('Navigate: Cannot result in Challenge on opponent CiC!'); return;
   }
-  log(`${cap(currentTurn)} Ship navigates to (${r},${c}).`, 'important');
+  log(`${armyName(currentTurn)} Ship navigates to (${r},${c}).`, 'important');
   navSelectedShip = null;
   selected=null; validMoves=[];
   endTurn();
@@ -1816,7 +1845,7 @@ function activateDefend(army) {
 
   mode = 'defend';
   defendState[army] = 'used';
-  log(`${cap(army)} activates DEFEND! Move CiC and one Army Officer within Red Zone.`, 'important');
+  log(`${armyName(army)} activates DEFEND! Move CiC and one Army Officer within Red Zone.`, 'important');
   selected=null; validMoves=[]; render(); updateUI();
 }
 
@@ -1850,7 +1879,7 @@ function handleDefendClick(r, c) {
     log('Defend: Cannot result in Challenge!'); selected=null; validMoves=[]; render(); return;
   }
   defendDone.push(piece.type);
-  log(`${cap(currentTurn)} ${cap(piece.type)} defended to (${r},${c}).`);
+  log(`${armyName(currentTurn)} ${cap(piece.type)} defended to (${r},${c}).`);
   selected=null; validMoves=[];
 
   if (defendDone.length >= 2) {
@@ -1930,18 +1959,18 @@ window.doRecruit = function(idx) {
     }
   }
   board[recruitRow][recruitCol] = mkPiece(piece.type, recruitArmy);
-  log(`${cap(recruitArmy)} recruits ${cap(piece.type)}!`, 'important');
+  log(`${armyName(recruitArmy)} recruits ${cap(piece.type)}!`, 'important');
   closeRecruitOverlay();
 };
 
 window.doRecruitPowerPlay = function() {
   powerPlayState[recruitArmy] = 'available';
-  log(`${cap(recruitArmy)} gains a Power Play!`, 'important');
+  log(`${armyName(recruitArmy)} gains a Power Play!`, 'important');
   closeRecruitOverlay();
 };
 
 window.doRecruitSkip = function() {
-  log(`${cap(recruitArmy)} skips recruiting.`);
+  log(`${armyName(recruitArmy)} skips recruiting.`);
   closeRecruitOverlay();
 };
 
@@ -2674,7 +2703,7 @@ function executeAiPowerPlaySeq(army, moves, idx) {
     animating = false;
     if (!gameOver) {
       const opp = army === 'gray' ? 'green' : 'gray';
-      if (isInChallenge(opp)) log(`CHALLENGE! ${cap(army)} threatens the ${cap(opp)} Commander-in-Chief!`, 'challenge-log');
+      if (isInChallenge(opp)) log(`CHALLENGE! ${armyName(army)} threatens the ${armyName(opp)} Commander-in-Chief!`, 'challenge-log');
       endTurn();
     }
     render(); updateUI();
@@ -3295,97 +3324,205 @@ function playTone(opts) {
   } catch(e) { /* silent fail */ }
 }
 
-// Per-piece move sounds
+// Per-piece move sounds — each has a distinct, thematic character
 function playMoveSound(pieceType) {
   if (!soundEnabled) return;
-  switch(pieceType) {
-    case 'foot':
-      // Crisp mechanical click
-      playTone({ type:'square', freq:800, duration:0.07, volume:0.12, attack:0.002, decay:0.04, noiseAmt:0.06 });
-      break;
-    case 'officer':
-      // Low rumbling tank — two layered tones
-      playTone({ type:'sawtooth', freq:90,  duration:0.25, volume:0.10, attack:0.03, noiseAmt:0.08 });
-      setTimeout(()=>playTone({ type:'square', freq:55, duration:0.18, volume:0.07, attack:0.02, noiseAmt:0.05 }), 60);
-      break;
-    case 'plane':
-      // Rising engine whine
-      playTone({ type:'sawtooth', freq:320, freqSlide:480, duration:0.30, volume:0.10, attack:0.04, noiseAmt:0.03 });
-      break;
-    case 'ship':
-      // Low foghorn-style thud
-      playTone({ type:'sine', freq:110, freq2:80, duration:0.35, volume:0.13, attack:0.05, noiseAmt:0.04 });
-      break;
-    case 'general':
-      // Commanding double-beat
-      playTone({ type:'triangle', freq:260, duration:0.15, volume:0.12, attack:0.01 });
-      setTimeout(()=>playTone({ type:'triangle', freq:220, duration:0.20, volume:0.10, attack:0.01 }), 100);
-      break;
-    case 'cic':
-      // Authoritative low tone
-      playTone({ type:'sine', freq:180, duration:0.28, volume:0.14, attack:0.03 });
-      break;
-    default:
-      playTone({ type:'sine', freq:500, duration:0.10, volume:0.10 });
-  }
-}
-
-function playCaptureSound() {
-  if (!soundEnabled) return;
-  // Explosive burst — fast noise + descending tone
   try {
     const ctx = getAudioCtx();
     if (ctx.state === 'suspended') ctx.resume();
     const now = ctx.currentTime;
 
-    // Noise burst
-    const bufSize = Math.floor(ctx.sampleRate * 0.35);
-    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
-    const noise = ctx.createBufferSource();
-    noise.buffer = buf;
-    const nf = ctx.createBiquadFilter();
-    nf.type = 'lowpass'; nf.frequency.value = 800;
-    const ng = ctx.createGain();
-    ng.gain.setValueAtTime(0.28, now);
-    ng.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
-    noise.connect(nf); nf.connect(ng); ng.connect(ctx.destination);
-    noise.start(now); noise.stop(now + 0.38);
+    switch(pieceType) {
 
-    // Low boom
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(140, now);
-    osc.frequency.exponentialRampToValueAtTime(40, now + 0.28);
-    const og = ctx.createGain();
-    og.gain.setValueAtTime(0.22, now);
-    og.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
-    osc.connect(og); og.connect(ctx.destination);
-    osc.start(now); osc.stop(now + 0.32);
+      case 'foot': {
+        // Crisp boot-on-stone click: sharp noise transient + short mid-tone
+        const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.06), ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.exp(-i/(d.length*0.18));
+        const ns = ctx.createBufferSource(); ns.buffer = buf;
+        const nf = ctx.createBiquadFilter(); nf.type='bandpass'; nf.frequency.value=2200; nf.Q.value=1.2;
+        const ng = ctx.createGain(); ng.gain.setValueAtTime(0.18, now); ng.gain.exponentialRampToValueAtTime(0.001, now+0.06);
+        ns.connect(nf); nf.connect(ng); ng.connect(ctx.destination); ns.start(now);
+        // Tiny tap tone underneath
+        const o = ctx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(900,now); o.frequency.exponentialRampToValueAtTime(400,now+0.04);
+        const og = ctx.createGain(); og.gain.setValueAtTime(0.08,now); og.gain.exponentialRampToValueAtTime(0.001,now+0.05);
+        o.connect(og); og.connect(ctx.destination); o.start(now); o.stop(now+0.06);
+        break;
+      }
+
+      case 'officer': {
+        // Tank engine chug: low rumble + metallic rattle
+        [0, 0.07, 0.14].forEach((t, i) => {
+          setTimeout(() => {
+            playTone({ type:'sawtooth', freq:80 - i*8, duration:0.14, volume:0.09, attack:0.01, noiseAmt:0.07 });
+          }, t * 1000);
+        });
+        // Low engine growl underneath the chugs
+        playTone({ type:'sawtooth', freq:55, duration:0.38, volume:0.06, attack:0.04, noiseAmt:0.05 });
+        break;
+      }
+
+      case 'plane': {
+        // Jet engine: fast swell + pitch glide up then fade
+        const o = ctx.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(200, now);
+        o.frequency.exponentialRampToValueAtTime(900, now + 0.22);
+        o.frequency.exponentialRampToValueAtTime(600, now + 0.38);
+        const og = ctx.createGain();
+        og.gain.setValueAtTime(0, now);
+        og.gain.linearRampToValueAtTime(0.12, now + 0.06);
+        og.gain.exponentialRampToValueAtTime(0.001, now + 0.40);
+        // Slight distortion via waveshaper
+        const ws = ctx.createWaveShaper();
+        const curve = new Float32Array(256);
+        for (let i=0;i<256;i++) { const x=i*2/255-1; curve[i]=x*(3+2)/(1+2*Math.abs(x)); }
+        ws.curve = curve;
+        o.connect(ws); ws.connect(og); og.connect(ctx.destination);
+        o.start(now); o.stop(now + 0.42);
+        // Noise rush (wind)
+        const nb = ctx.createBuffer(1, Math.floor(ctx.sampleRate*0.32), ctx.sampleRate);
+        const nd = nb.getChannelData(0); for (let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
+        const ns2 = ctx.createBufferSource(); ns2.buffer=nb;
+        const nf2 = ctx.createBiquadFilter(); nf2.type='highpass'; nf2.frequency.value=1800;
+        const ng2 = ctx.createGain(); ng2.gain.setValueAtTime(0.06,now); ng2.gain.exponentialRampToValueAtTime(0.001,now+0.32);
+        ns2.connect(nf2); nf2.connect(ng2); ng2.connect(ctx.destination); ns2.start(now);
+        break;
+      }
+
+      case 'ship': {
+        // Deep foghorn + water splash
+        const o = ctx.createOscillator(); o.type='sine';
+        o.frequency.setValueAtTime(95, now); o.frequency.setValueAtTime(88, now+0.15);
+        const og = ctx.createGain();
+        og.gain.setValueAtTime(0, now); og.gain.linearRampToValueAtTime(0.16, now+0.08);
+        og.gain.exponentialRampToValueAtTime(0.001, now+0.50);
+        o.connect(og); og.connect(ctx.destination); o.start(now); o.stop(now+0.52);
+        // Harmonic
+        const o2 = ctx.createOscillator(); o2.type='sine'; o2.frequency.value=190;
+        const og2 = ctx.createGain(); og2.gain.setValueAtTime(0.06,now); og2.gain.exponentialRampToValueAtTime(0.001,now+0.35);
+        o2.connect(og2); og2.connect(ctx.destination); o2.start(now); o2.stop(now+0.37);
+        // Splash noise
+        const nb = ctx.createBuffer(1, Math.floor(ctx.sampleRate*0.18), ctx.sampleRate);
+        const nd = nb.getChannelData(0); for (let i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1)*Math.exp(-i/(nd.length*0.3));
+        const ns = ctx.createBufferSource(); ns.buffer=nb;
+        const nf = ctx.createBiquadFilter(); nf.type='bandpass'; nf.frequency.value=800; nf.Q.value=0.8;
+        const ng = ctx.createGain(); ng.gain.setValueAtTime(0.10,now); ng.gain.exponentialRampToValueAtTime(0.001,now+0.18);
+        ns.connect(nf); nf.connect(ng); ng.connect(ctx.destination); ns.start(now+0.04);
+        break;
+      }
+
+      case 'general': {
+        // Commanding march-step: two firm thumps with resonance
+        [[0,220,0.18],[0.12,196,0.16]].forEach(([t,f,v]) => {
+          playTone({ type:'triangle', freq:f, duration:0.22, volume:v, attack:0.008, noiseAmt:0.03 });
+        });
+        // Authority shimmer
+        setTimeout(()=>playTone({ type:'sine', freq:440, duration:0.15, volume:0.06, attack:0.02 }), 80);
+        break;
+      }
+
+      case 'cic': {
+        // Majestic — low bell tone + soft harmonic chord
+        const freqs = [180, 270, 360];
+        freqs.forEach((f, i) => {
+          const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=f;
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0, now+i*0.02);
+          g.gain.linearRampToValueAtTime(0.10 - i*0.025, now+i*0.02+0.04);
+          g.gain.exponentialRampToValueAtTime(0.001, now+0.55-i*0.05);
+          o.connect(g); g.connect(ctx.destination); o.start(now+i*0.02); o.stop(now+0.60);
+        });
+        break;
+      }
+
+      default:
+        playTone({ type:'sine', freq:500, duration:0.10, volume:0.10 });
+    }
+  } catch(e) {}
+}
+
+function playCaptureSound() {
+  if (!soundEnabled) return;
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+
+    // Layer 1: sharp crack (high-passed noise burst)
+    const b1 = ctx.createBuffer(1, Math.floor(ctx.sampleRate*0.12), ctx.sampleRate);
+    const d1 = b1.getChannelData(0);
+    for (let i=0;i<d1.length;i++) d1[i]=(Math.random()*2-1)*Math.exp(-i/(d1.length*0.15));
+    const ns1 = ctx.createBufferSource(); ns1.buffer=b1;
+    const nf1 = ctx.createBiquadFilter(); nf1.type='highpass'; nf1.frequency.value=2000;
+    const ng1 = ctx.createGain(); ng1.gain.setValueAtTime(0.35,now); ng1.gain.exponentialRampToValueAtTime(0.001,now+0.12);
+    ns1.connect(nf1); nf1.connect(ng1); ng1.connect(ctx.destination); ns1.start(now);
+
+    // Layer 2: low-mid body thud
+    const b2 = ctx.createBuffer(1, Math.floor(ctx.sampleRate*0.30), ctx.sampleRate);
+    const d2 = b2.getChannelData(0);
+    for (let i=0;i<d2.length;i++) d2[i]=(Math.random()*2-1)*Math.exp(-i/(d2.length*0.25));
+    const ns2 = ctx.createBufferSource(); ns2.buffer=b2;
+    const nf2 = ctx.createBiquadFilter(); nf2.type='lowpass'; nf2.frequency.value=600;
+    const ng2 = ctx.createGain(); ng2.gain.setValueAtTime(0.28,now); ng2.gain.exponentialRampToValueAtTime(0.001,now+0.28);
+    ns2.connect(nf2); nf2.connect(ng2); ng2.connect(ctx.destination); ns2.start(now);
+
+    // Layer 3: descending boom tone
+    const o = ctx.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(160,now); o.frequency.exponentialRampToValueAtTime(38,now+0.30);
+    const og = ctx.createGain(); og.gain.setValueAtTime(0.20,now); og.gain.exponentialRampToValueAtTime(0.001,now+0.32);
+    o.connect(og); og.connect(ctx.destination); o.start(now); o.stop(now+0.34);
   } catch(e) {}
 }
 
 function playVictorySound() {
   if (!soundEnabled) return;
-  // Ascending fanfare — 5 notes
-  const notes = [523, 659, 784, 1047, 1319]; // C E G C E
-  notes.forEach((freq, i) => {
-    setTimeout(() => {
-      playTone({ type:'triangle', freq, duration:0.28, volume:0.16, attack:0.02 });
-      if (i === notes.length - 1) {
-        // Final long sustain
-        setTimeout(()=>playTone({ type:'sine', freq:1047, duration:0.6, volume:0.14, attack:0.05 }), 60);
-      }
-    }, i * 140);
-  });
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    // Triumphant fanfare: C-E-G-C-E chord swell then short melody
+    const melody = [
+      {f:523, t:0,    d:0.40, v:0.14},
+      {f:659, t:0.15, d:0.38, v:0.13},
+      {f:784, t:0.30, d:0.36, v:0.13},
+      {f:1047,t:0.45, d:0.50, v:0.15},
+      {f:1319,t:0.60, d:0.70, v:0.14},
+      {f:1047,t:0.85, d:0.55, v:0.12},
+      {f:1319,t:1.05, d:0.80, v:0.16},
+    ];
+    const now = ctx.currentTime;
+    melody.forEach(({f, t, d, v}) => {
+      const o = ctx.createOscillator(); o.type = 'triangle';
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now+t);
+      g.gain.linearRampToValueAtTime(v, now+t+0.03);
+      g.gain.exponentialRampToValueAtTime(0.001, now+t+d);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(now+t); o.stop(now+t+d+0.05);
+      // Add a soft harmonic at 2x
+      const o2 = ctx.createOscillator(); o2.type='sine'; o2.frequency.value=f*2;
+      const g2 = ctx.createGain(); g2.gain.setValueAtTime(0,now+t); g2.gain.linearRampToValueAtTime(v*0.25,now+t+0.03); g2.gain.exponentialRampToValueAtTime(0.001,now+t+d*0.7);
+      o2.connect(g2); g2.connect(ctx.destination); o2.start(now+t); o2.stop(now+t+d);
+    });
+  } catch(e) {}
 }
 
 function playChallengeSound() {
   if (!soundEnabled) return;
-  // Urgent warning pulse
-  playTone({ type:'square', freq:880, duration:0.10, volume:0.13, attack:0.005 });
-  setTimeout(()=>playTone({ type:'square', freq:880, duration:0.10, volume:0.13, attack:0.005 }), 160);
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const now = ctx.currentTime;
+    // Three-beat alarm: descending minor interval, urgent feel
+    [[0, 880, 0.12], [0.18, 740, 0.12], [0.36, 880, 0.18]].forEach(([t, f, d]) => {
+      const o = ctx.createOscillator(); o.type='square'; o.frequency.value=f;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.14, now+t);
+      g.gain.exponentialRampToValueAtTime(0.001, now+t+d);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(now+t); o.stop(now+t+d+0.02);
+    });
+  } catch(e) {}
 }
 
 // Hook sounds into executeMove — inject after board changes
