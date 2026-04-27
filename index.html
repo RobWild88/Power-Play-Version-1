@@ -417,6 +417,131 @@
   }
 
 
+  /* ===== MOVE HISTORY ===== */
+  .history-section {
+    width: 100%;
+    max-width: 680px;
+    margin-top: 8px;
+  }
+  .history-toggle {
+    background: #16213e;
+    border: 1px solid #444;
+    border-radius: 4px 4px 0 0;
+    color: #aaa;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.78em;
+    padding: 4px 10px;
+    width: 100%;
+    text-align: left;
+  }
+  .history-toggle:hover { color: #f39c12; }
+  .history-body {
+    display: none;
+    background: #0d0d1a;
+    border: 1px solid #444;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    padding: 8px;
+  }
+  .history-body.open { display: block; }
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.72em;
+    color: #aaa;
+  }
+  .history-table th {
+    color: #f39c12;
+    border-bottom: 1px solid #333;
+    padding: 2px 6px;
+    text-align: left;
+    font-weight: normal;
+  }
+  .history-table td {
+    padding: 2px 6px;
+    border-bottom: 1px solid #1a1a2e;
+  }
+  .history-table tr.gray-row td  { color: #bbb; }
+  .history-table tr.green-row td { color: #2ecc71; }
+  .undo-area {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #undoBtn {
+    background: #5d6d7e;
+    color: #fff;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+    font-weight: bold;
+  }
+  #undoBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .undo-label { font-size: 0.7em; color: #666; }
+
+  /* ===== TOAST ===== */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #f39c12;
+    color: #1a1a2e;
+    padding: 7px 18px;
+    border-radius: 20px;
+    font-size: 0.85em;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 9999;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ===== REPLAY CONTROLS ===== */
+  #replayBar {
+    display: none;
+    background: #16213e;
+    border: 1px solid #e67e22;
+    border-radius: 6px;
+    padding: 7px 12px;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+    font-size: 0.82em;
+  }
+  #replayBar.show { display: flex; }
+  #replayBar span { color: #e67e22; font-weight: bold; }
+  .replay-btn {
+    background: #e67e22;
+    color: #fff;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+    font-weight: bold;
+  }
+  .replay-btn.stop-btn { background: #c0392b; }
+  .replay-speed {
+    background: #0d0d1a;
+    color: #eee;
+    border: 1px solid #555;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+    padding: 3px 6px;
+  }
+
   /* ===== PIECE SLIDE ANIMATION ===== */
   .piece-flyer {
     position: fixed;
@@ -440,7 +565,10 @@
   <button class="help-btn rules-btn" onclick="openRules()">📖 RULES</button>
   <button class="help-btn tutorial-btn" onclick="openTutorial()">🎓 TUTORIAL</button>
   <button class="help-btn" style="background:#7d3c98;" onclick="openSetup()">⚙️ NEW GAME</button>
+  <button class="help-btn" style="background:#1a6636;" onclick="saveGame()">💾 SAVE</button>
+  <button class="help-btn" style="background:#1a4a6e;" onclick="loadGamePrompt()">📂 LOAD</button>
 </div>
+<input type="file" id="loadFileInput" accept=".json" style="display:none" onchange="loadGameFromFile(event)">
 
 <div class="options-bar">
   <label><input type="checkbox" id="bombingOpt"> Enable Bombing Missions (optional rules)</label>
@@ -472,6 +600,16 @@
 
   <!-- BOARD -->
   <div class="board-wrap">
+    <div id="replayBar">
+      <span>▶ REPLAY</span>
+      <button class="replay-btn" id="replayPauseBtn" onclick="replayTogglePause()">⏸ PAUSE</button>
+      <select class="replay-speed" id="replaySpeed">
+        <option value="2500">🐢 Slow</option>
+        <option value="1500" selected>▶ Normal</option>
+        <option value="500">⚡ Fast</option>
+      </select>
+      <button class="replay-btn stop-btn" onclick="replayStop()">⏹ STOP</button>
+    </div>
     <div id="board"></div>
     <div class="dice-section" id="diceSection">
       <h4>🎲 Bombing Roll (d10)</h4>
@@ -515,6 +653,24 @@
 <div style="width:100%;max-width:680px;margin-top:8px;">
   <div class="log-box" id="logBox"></div>
 </div>
+
+<!-- MOVE HISTORY -->
+<div class="history-section">
+  <button class="history-toggle" onclick="toggleHistory()">📋 MOVE HISTORY ▾</button>
+  <div class="history-body" id="historyBody">
+    <table class="history-table">
+      <thead><tr><th>#</th><th>Army</th><th>Move</th></tr></thead>
+      <tbody id="historyTableBody"></tbody>
+    </table>
+    <div class="undo-area">
+      <button id="undoBtn" onclick="undoMove()" disabled>↩ UNDO</button>
+      <span class="undo-label">Take back last move (Easy &amp; Medium only)</span>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
 
 <!-- SETUP MODAL -->
 <div class="modal-overlay" id="setupModal" onclick="closeOnOverlay(event,'setupModal')">
@@ -618,7 +774,10 @@
 <div id="gameOver">
   <h2 id="gameOverTitle">GAME OVER</h2>
   <p id="gameOverMsg"></p>
-  <button id="restartBtn" onclick="initGame()">PLAY AGAIN</button>
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+    <button id="restartBtn" onclick="initGame()">PLAY AGAIN</button>
+    <button id="replayBtn" onclick="startReplay()" style="background:#2980b9;color:#fff;border:none;padding:10px 28px;font-size:1.1em;border-radius:6px;cursor:pointer;font-family:'Courier New',monospace;font-weight:bold;">▶ WATCH REPLAY</button>
+  </div>
 </div>
 
 <script>
@@ -680,6 +839,13 @@ let aiThinkTimer = null;
 let lastAiMove = null; // { from:[[r,c],...], to:[[r,c],...] } for AI move highlight
 let animating  = false; // true while a piece slide animation is running
 
+// ---- Move history / undo / replay ----
+let moveHistory = [];      // array of { snap, desc, army, moveNum }
+let undoUsedThisTurn = false;  // prevent spam undo
+let replayActive = false;
+let replayPaused = false;
+let replayStepTimer = null;
+
 function mkPiece(type, army) { return { type, army, moved: false }; }
 
 function initGame() {
@@ -701,6 +867,15 @@ function initGame() {
   if (aiThinkTimer) { clearTimeout(aiThinkTimer); aiThinkTimer = null; }
   animating = false; lastAiMove = null;
   document.getElementById('aiThinking').style.display = 'none';
+
+  // Reset history / undo / replay
+  moveHistory = [];
+  undoUsedThisTurn = false;
+  replayActive = false;
+  replayPaused = false;
+  if (replayStepTimer) { clearTimeout(replayStepTimer); replayStepTimer = null; }
+  document.getElementById('replayBar').classList.remove('show');
+  updateHistoryUI();
 
   // Place pieces
   const backRow = [PIECE_TYPES.OFFICER, PIECE_TYPES.PLANE, PIECE_TYPES.SHIP,
@@ -907,6 +1082,9 @@ function updateUI() {
   } else if (mode === 'defend') {
     document.getElementById(`${currentTurn}DefBtn`).classList.add('active');
   }
+
+  // Update history panel
+  updateHistoryUI();
 }
 
 function canDefend(army) {
@@ -948,6 +1126,7 @@ function isThreatened(row, col, byArmy) {
 // ===================== MOVE GENERATION =====================
 function onCellClick(r, c) {
   if (gameOver) return;
+  if (replayActive) return;
   // Block clicks while animating or when it's the AI's turn
   if (animating) return;
   if (gameMode !== '2p' && currentTurn === aiArmy) return;
@@ -1199,6 +1378,15 @@ function executeMove(fromR, fromC, toR, toC, vm) {
   const target = board[toR][toC];
   const opp = piece.army === 'gray' ? 'green' : 'gray';
 
+  // Snapshot before this move (only for non-PP continuation — PP snapshots once at activation)
+  const isFirstPPMove = mode === 'powerplay' && ppState && ppState.moved.length === 0;
+  const isNormalMove  = mode !== 'powerplay';
+  if (isNormalMove || isFirstPPMove) {
+    const targetName = target ? ` captures ${cap(target.army)} ${cap(target.type)}` : `→ (${toR},${toC})`;
+    const desc = `${cap(piece.army)} ${cap(piece.type)}${targetName}`;
+    pushMoveSnapshot(desc, piece.army);
+  }
+
   // Barrier check for non-plane pieces
   if (piece.type !== PIECE_TYPES.PLANE && crossesBarrier(fromR,fromC,toR,toC,piece.army)) {
     log('Blocked by enemy barrier!', 'important');
@@ -1315,6 +1503,7 @@ function endTurn() {
   mode = 'normal'; ppState = null;
   document.getElementById('grayPPInfo').style.display = 'none';
   document.getElementById('greenPPInfo').style.display = 'none';
+  undoUsedThisTurn = false;
 
   // Check if new current player has any legal moves
   if (!hasAnyLegalMove(currentTurn)) {
@@ -1349,6 +1538,10 @@ function endGame(winner) {
   document.getElementById('gameOverMsg').textContent = `The ${cap(winner === 'gray' ? 'green' : 'gray')} Commander-in-Chief has been captured.`;
   document.getElementById('gameOver').classList.add('show');
   log(`GAME OVER — ${cap(winner)} Army wins!`, 'important');
+  updateHistoryUI();
+  // Show replay button only if there are moves to replay
+  const replayBtn = document.getElementById('replayBtn');
+  if (replayBtn) replayBtn.style.display = moveHistory.length > 0 ? '' : 'none';
 }
 
 // ===================== PLANE LINK =====================
@@ -2541,6 +2734,339 @@ function playCaptureAnimation(targetEl, targetPieceSrc, capturedArmy) {
 
   // Cleanup
   setTimeout(() => { flash.remove(); ghost.remove(); bangEl.remove(); }, 650);
+}
+
+// ===================== MOVE HISTORY & UNDO =====================
+function fullSnapshot() {
+  return {
+    board:          board.map(row => row.map(p => p ? {...p} : null)),
+    currentTurn,
+    powerPlayState: {...powerPlayState},
+    navigateState:  {...navigateState},
+    defendState:    {...defendState},
+    capturedBy:     { gray: capturedBy.gray.map(p=>({...p})), green: capturedBy.green.map(p=>({...p})) },
+    planeLink:      { gray: {...planeLink.gray}, green: {...planeLink.green} },
+    mode:           'normal',
+    gameMode,
+    humanArmy
+  };
+}
+
+function applyFullSnapshot(snap) {
+  board          = snap.board.map(row => row.map(p => p ? {...p} : null));
+  currentTurn    = snap.currentTurn;
+  powerPlayState = {...snap.powerPlayState};
+  navigateState  = {...snap.navigateState};
+  defendState    = {...snap.defendState};
+  capturedBy     = { gray: snap.capturedBy.gray.map(p=>({...p})), green: snap.capturedBy.green.map(p=>({...p})) };
+  planeLink      = { gray: {...snap.planeLink.gray}, green: {...snap.planeLink.green} };
+  mode           = snap.mode || 'normal';
+  ppState        = null;
+  selected       = null;
+  validMoves     = [];
+  gameOver       = false;
+}
+
+function pushMoveSnapshot(desc, army) {
+  const snap = fullSnapshot();
+  // snap is the state BEFORE the move executes — store pre-move state
+  const num = moveHistory.length + 1;
+  moveHistory.push({ snap, desc, army, moveNum: num });
+  // Cap history to avoid huge memory use (keep last 60 entries)
+  if (moveHistory.length > 60) moveHistory.shift();
+  updateHistoryUI();
+}
+
+function updateHistoryUI() {
+  const tbody = document.getElementById('historyTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  // Show last 6 entries (3 per side roughly)
+  const recent = moveHistory.slice(-6);
+  recent.forEach(entry => {
+    const tr = document.createElement('tr');
+    tr.className = entry.army === 'gray' ? 'gray-row' : 'green-row';
+    tr.innerHTML = `<td>${entry.moveNum}</td><td>${entry.army === 'gray' ? '🪖 Gray' : '🌿 Green'}</td><td>${entry.desc}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Undo button: enabled only on easy/medium, human player's turn, not already used this turn
+  const undoBtn = document.getElementById('undoBtn');
+  if (!undoBtn) return;
+  const canUndo = (gameMode === 'easy' || gameMode === 'medium') &&
+                  !undoUsedThisTurn &&
+                  moveHistory.length >= 1 &&
+                  !gameOver &&
+                  !replayActive;
+  undoBtn.disabled = !canUndo;
+}
+
+function undoMove() {
+  if (undoUsedThisTurn) return;
+  if (moveHistory.length < 1) return;
+  if (gameMode !== 'easy' && gameMode !== 'medium') return;
+
+  // Pop the last entry (the pre-move snapshot = state before that move)
+  const entry = moveHistory.pop();
+  applyFullSnapshot(entry.snap);
+  undoUsedThisTurn = true;
+  log(`↩ Undo: ${entry.desc} reversed.`, 'important');
+  render(); updateUI(); updateHistoryUI();
+}
+
+function toggleHistory() {
+  const body = document.getElementById('historyBody');
+  body.classList.toggle('open');
+  const btn = body.previousElementSibling;
+  btn.textContent = body.classList.contains('open') ? '📋 MOVE HISTORY ▴' : '📋 MOVE HISTORY ▾';
+}
+
+// ===================== SAVE / LOAD =====================
+function saveGame() {
+  if (gameOver) { showToast('Game is over — start a new game first.'); return; }
+  const saveData = {
+    version: 1,
+    timestamp: Date.now(),
+    board: board.map(row => row.map(p => p ? {...p} : null)),
+    currentTurn,
+    powerPlayState: {...powerPlayState},
+    navigateState:  {...navigateState},
+    defendState:    {...defendState},
+    capturedBy:     { gray: capturedBy.gray.map(p=>({...p})), green: capturedBy.green.map(p=>({...p})) },
+    planeLink:      { gray: {...planeLink.gray}, green: {...planeLink.green} },
+    mode: 'normal',
+    gameMode,
+    humanArmy,
+    aiArmy,
+    bombingActive,
+    moveHistory: moveHistory.map(e => ({ desc: e.desc, army: e.army, moveNum: e.moveNum, snap: e.snap }))
+  };
+  const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'powerplay-save.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('Game saved! ✅');
+}
+
+function loadGamePrompt() {
+  document.getElementById('loadFileInput').click();
+}
+
+function loadGameFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.version !== 1) { showToast('Unrecognized save file.'); return; }
+
+      // Stop any AI timers
+      if (aiThinkTimer) { clearTimeout(aiThinkTimer); aiThinkTimer = null; }
+      if (replayStepTimer) { clearTimeout(replayStepTimer); replayStepTimer = null; }
+      replayActive = false;
+      document.getElementById('replayBar').classList.remove('show');
+
+      board          = data.board.map(row => row.map(p => p ? {...p} : null));
+      currentTurn    = data.currentTurn;
+      powerPlayState = {...data.powerPlayState};
+      navigateState  = {...data.navigateState};
+      defendState    = {...data.defendState};
+      capturedBy     = { gray: data.capturedBy.gray.map(p=>({...p})), green: data.capturedBy.green.map(p=>({...p})) };
+      planeLink      = { gray: {...data.planeLink.gray}, green: {...data.planeLink.green} };
+      gameMode       = data.gameMode;
+      humanArmy      = data.humanArmy;
+      aiArmy         = data.aiArmy || (humanArmy === 'gray' ? 'green' : 'gray');
+      bombingActive  = data.bombingActive || false;
+      moveHistory    = (data.moveHistory || []).map(e => ({...e}));
+      mode           = 'normal';
+      ppState        = null;
+      selected       = null;
+      validMoves     = [];
+      gameOver       = false;
+      undoUsedThisTurn = false;
+      animating      = false;
+      lastAiMove     = null;
+
+      document.getElementById('gameOver').classList.remove('show');
+      document.getElementById('aiThinking').style.display = 'none';
+      document.getElementById('bombingOpt').checked = bombingActive;
+      render(); updateUI(); updateHistoryUI();
+      clearLog();
+      log('Game loaded! ✅', 'important');
+      showToast('Game loaded! ✅');
+
+      // Resume AI if it's AI's turn
+      if (gameMode !== '2p' && currentTurn === aiArmy && !gameOver) {
+        scheduleAiMove();
+      }
+    } catch(err) {
+      showToast('Failed to load save file.');
+      console.error(err);
+    }
+  };
+  reader.readAsText(file);
+  // Reset input so same file can be loaded again
+  event.target.value = '';
+}
+
+// ===================== TOAST =====================
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ===================== REPLAY =====================
+let replayHistory  = [];
+let replayIndex    = 0;
+
+function startReplay() {
+  if (moveHistory.length === 0) { showToast('No moves to replay.'); return; }
+
+  // Store a copy of history for replay
+  replayHistory = moveHistory.map(e => ({...e, snap: e.snap}));
+  replayIndex   = 0;
+  replayActive  = true;
+  replayPaused  = false;
+
+  // Hide game over, show replay bar
+  document.getElementById('gameOver').classList.remove('show');
+  document.getElementById('replayBar').classList.add('show');
+  document.getElementById('replayPauseBtn').textContent = '⏸ PAUSE';
+
+  // Reset board to initial position using the first snapshot
+  if (replayHistory.length > 0) {
+    applyFullSnapshot(replayHistory[0].snap);
+  }
+  selected = null; validMoves = [];
+  render(); updateUI();
+  clearLog();
+  log('▶ Replay started — watching the game from the beginning…', 'important');
+
+  // Kick off the first move after a short delay
+  replayStepTimer = setTimeout(replayStep, 800);
+}
+
+function replayStep() {
+  if (!replayActive || replayPaused) return;
+  if (replayIndex >= replayHistory.length) {
+    // Replay complete
+    replayFinish();
+    return;
+  }
+
+  const entry = replayHistory[replayIndex];
+  const speed = parseInt(document.getElementById('replaySpeed').value, 10) || 1500;
+
+  // Apply the pre-move snapshot so pieces are in position before the animation
+  applyFullSnapshot(entry.snap);
+  render();
+
+  // Parse the move from the description to animate it
+  // We don't store from/to coords in history so we advance to next snapshot and diff boards
+  const nextEntry = replayHistory[replayIndex + 1];
+  const nextBoard = nextEntry
+    ? nextEntry.snap.board.map(row => row.map(p => p ? {...p} : null))
+    : null;
+
+  replayIndex++;
+  log(`[${replayIndex}/${replayHistory.length}] ${entry.army === 'gray' ? '🪖' : '🌿'} ${entry.desc}`);
+
+  // Find which piece moved by diffing current vs next board
+  let fromR = -1, fromC = -1, toR = -1, toC = -1, pieceImg = null;
+  if (nextBoard) {
+    // Find the 'from' cell: had a friendly piece, now empty
+    outer:
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const cur  = entry.snap.board[r][c];
+        const next = nextBoard[r][c];
+        if (cur && cur.army === entry.army && (!next || next.army !== entry.army)) {
+          // Check if this piece appears elsewhere
+          const type = cur.type;
+          for (let r2 = 0; r2 < 8; r2++) {
+            for (let c2 = 0; c2 < 8; c2++) {
+              const dest = nextBoard[r2][c2];
+              if (dest && dest.army === entry.army && dest.type === type &&
+                  !(r2 === r && c2 === c)) {
+                const wasHere = entry.snap.board[r2][c2];
+                if (!wasHere || wasHere.army !== entry.army) {
+                  fromR = r; fromC = c; toR = r2; toC = c2;
+                  pieceImg = IMAGES[entry.army][type];
+                  break outer;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (fromR >= 0 && pieceImg && nextBoard) {
+    // Animate the slide, then apply next state
+    animating = true;
+    animatePieceSlide(fromR, fromC, toR, toC, pieceImg, () => {
+      animating = false;
+      // Apply the post-move state (next snapshot's pre-move = current state after move)
+      if (nextEntry) {
+        applyFullSnapshot(nextEntry.snap);
+      } else {
+        // Last move — apply final board from replay history last snap context
+        // Just leave board as-is (already advanced)
+      }
+      render(); updateUI();
+      if (replayActive && !replayPaused) {
+        replayStepTimer = setTimeout(replayStep, speed);
+      }
+    });
+  } else {
+    // No animation found (special move or first entry) — just advance state
+    if (nextEntry) applyFullSnapshot(nextEntry.snap);
+    render(); updateUI();
+    if (replayActive && !replayPaused) {
+      replayStepTimer = setTimeout(replayStep, speed);
+    }
+  }
+}
+
+function replayTogglePause() {
+  if (!replayActive) return;
+  replayPaused = !replayPaused;
+  const btn = document.getElementById('replayPauseBtn');
+  if (replayPaused) {
+    btn.textContent = '▶ RESUME';
+    if (replayStepTimer) { clearTimeout(replayStepTimer); replayStepTimer = null; }
+  } else {
+    btn.textContent = '⏸ PAUSE';
+    replayStep();
+  }
+}
+
+function replayStop() {
+  replayActive = false;
+  replayPaused = false;
+  if (replayStepTimer) { clearTimeout(replayStepTimer); replayStepTimer = null; }
+  document.getElementById('replayBar').classList.remove('show');
+  // Show game over screen again
+  document.getElementById('gameOver').classList.add('show');
+}
+
+function replayFinish() {
+  replayActive = false;
+  replayPaused = false;
+  document.getElementById('replayBar').classList.remove('show');
+  log('✅ Replay complete!', 'important');
+  setTimeout(() => {
+    document.getElementById('gameOver').classList.add('show');
+  }, 1200);
 }
 
 // ===================== INIT =====================
